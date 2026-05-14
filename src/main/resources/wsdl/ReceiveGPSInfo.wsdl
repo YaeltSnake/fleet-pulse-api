@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wsdl:definitions xmlns:s="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:tns="http://tempuri.org/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tm="http://microsoft.com/wsdl/mime/textMatching/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" targetNamespace="http://tempuri.org/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+    <wsdl:types>
+        <s:schema elementFormDefault="qualified" targetNamespace="http://tempuri.org/">
+            <s:element name="ReceiveGPSInformation">
+                <s:complexType>
+                    <s:sequence>
+                        <s:element minOccurs="0" maxOccurs="1" name="xmlGPSInfo">
+                            <s:complexType>
+                                <s:sequence>
+                                    <s:any processContents="lax" />
+                                </s:sequence>
+                            </s:complexType>
+                        </s:element>
+                    </s:sequence>
+                </s:complexType>
+            </s:element>
+            <s:element name="ReceiveGPSInformationResponse">
+                <s:complexType>
+                    <s:sequence>
+                        <s:element minOccurs="0" maxOccurs="1" name="ReceiveGPSInformationResult">
+                            <s:complexType>
+                                <s:sequence>
+                                    <s:any processContents="lax" />
+                                </s:sequence>
+                            </s:complexType>
+                        </s:element>
+                    </s:sequence>
+                </s:complexType>
+            </s:element>
+            <s:element name="ReceiveGPSInformation_Objeto">
+                <s:complexType>
+                    <s:sequence>
+                        <s:element minOccurs="0" maxOccurs="1" name="GPSInformation" type="tns:GPSInfo" />
+                    </s:sequence>
+                </s:complexType>
+            </s:element>
+            <s:complexType name="GPSInfo">
+                <s:sequence>
+                    <s:element minOccurs="0" maxOccurs="1" name="parametrosAdicionales" type="tns:ArrayOfParametroAdicional" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Proveedor" type="s:string" />
+                    <s:element minOccurs="1" maxOccurs="1" name="Latitud" type="s:decimal" />
+                    <s:element minOccurs="1" maxOccurs="1" name="Longitud" type="s:decimal" />
+                    <s:element minOccurs="0" maxOccurs="1" name="NumUnidad" type="s:string" />
+                    <s:element minOccurs="0" maxOccurs="1" name="NumRemolque" type="s:string" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Velocidad" type="s:string" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Placas" type="s:string" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Trackingnumber" type="s:string" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Ubicacion" type="s:string" />
+                    <s:element minOccurs="1" maxOccurs="1" name="FechaHoraEvento" type="s:dateTime" />
+                    <s:element minOccurs="1" maxOccurs="1" name="FechaRecepcion" type="s:dateTime" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Username" type="s:string" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Password" type="s:string" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Ruta" type="s:string" />
+                    <s:element minOccurs="0" maxOccurs="1" name="BOL" type="s:string" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Observaciones" type="s:string" />
+                </s:sequence>
+            </s:complexType>
+            <s:complexType name="ArrayOfParametroAdicional">
+                <s:sequence>
+                    <s:element minOccurs="0" maxOccurs="unbounded" name="ParametroAdicional" nillable="true" type="tns:ParametroAdicional" />
+                </s:sequence>
+            </s:complexType>
+            <s:complexType name="ParametroAdicional">
+                <s:sequence>
+                    <s:element minOccurs="0" maxOccurs="1" name="Clave" type="s:string" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Valor" type="s:string" />
+                </s:sequence>
+            </s:complexType>
+            <s:element name="ReceiveGPSInformation_ObjetoResponse">
+                <s:complexType>
+                    <s:sequence>
+                        <s:element minOccurs="0" maxOccurs="1" name="ReceiveGPSInformation_ObjetoResult" type="tns:Protocolo" />
+                    </s:sequence>
+                </s:complexType>
+            </s:element>
+            <s:complexType name="Protocolo">
+                <s:sequence>
+                    <s:element minOccurs="1" maxOccurs="1" name="ReceptionDate" type="s:dateTime" />
+                    <s:element minOccurs="0" maxOccurs="1" name="Message" type="s:string" />
+                    <s:element minOccurs="1" maxOccurs="1" name="Processed" type="s:boolean" />
+                </s:sequence>
+            </s:complexType>
+            <s:element name="ReceiveGPSInformation_Objetos">
+                <s:complexType>
+                    <s:sequence>
+                        <s:element minOccurs="0" maxOccurs="1" name="GPSInformation" type="tns:ArrayOfGPSInfo" />
+                    </s:sequence>
+                </s:complexType>
+            </s:element>
+            <s:complexType name="ArrayOfGPSInfo">
+                <s:sequence>
+                    <s:element minOccurs="0" maxOccurs="unbounded" name="GPSInfo" nillable="true" type="tns:GPSInfo" />
+                </s:sequence>
+            </s:complexType>
+            <s:element name="ReceiveGPSInformation_ObjetosResponse">
+                <s:complexType>
+                    <s:sequence>
+                        <s:element minOccurs="0" maxOccurs="1" name="ReceiveGPSInformation_ObjetosResult" type="tns:ArrayOfProtocolo" />
+                    </s:sequence>
+                </s:complexType>
+            </s:element>
+            <s:complexType name="ArrayOfProtocolo">
+                <s:sequence>
+                    <s:element minOccurs="0" maxOccurs="unbounded" name="Protocolo" nillable="true" type="tns:Protocolo" />
+                </s:sequence>
+            </s:complexType>
+            <s:element name="ReceiveGPSInformationMassiveXML">
+                <s:complexType>
+                    <s:sequence>
+                        <s:element minOccurs="0" maxOccurs="1" name="xmlGPSInfo">
+                            <s:complexType>
+                                <s:sequence>
+                                    <s:any processContents="lax" />
+                                </s:sequence>
+                            </s:complexType>
+                        </s:element>
+                    </s:sequence>
+                </s:complexType>
+            </s:element>
+            <s:element name="ReceiveGPSInformationMassiveXMLResponse">
+                <s:complexType>
+                    <s:sequence>
+                        <s:element minOccurs="0" maxOccurs="1" name="ReceiveGPSInformationMassiveXMLResult">
+                            <s:complexType>
+                                <s:sequence>
+                                    <s:any processContents="lax" />
+                                </s:sequence>
+                            </s:complexType>
+                        </s:element>
+                    </s:sequence>
+                </s:complexType>
+            </s:element>
+        </s:schema>
+    </wsdl:types>
+    <wsdl:message name="ReceiveGPSInformationSoapIn">
+        <wsdl:part name="parameters" element="tns:ReceiveGPSInformation" />
+    </wsdl:message>
+    <wsdl:message name="ReceiveGPSInformationSoapOut">
+        <wsdl:part name="parameters" element="tns:ReceiveGPSInformationResponse" />
+    </wsdl:message>
+    <wsdl:message name="ReceiveGPSInformation_ObjetoSoapIn">
+        <wsdl:part name="parameters" element="tns:ReceiveGPSInformation_Objeto" />
+    </wsdl:message>
+    <wsdl:message name="ReceiveGPSInformation_ObjetoSoapOut">
+        <wsdl:part name="parameters" element="tns:ReceiveGPSInformation_ObjetoResponse" />
+    </wsdl:message>
+    <wsdl:message name="ReceiveGPSInformation_ObjetosSoapIn">
+        <wsdl:part name="parameters" element="tns:ReceiveGPSInformation_Objetos" />
+    </wsdl:message>
+    <wsdl:message name="ReceiveGPSInformation_ObjetosSoapOut">
+        <wsdl:part name="parameters" element="tns:ReceiveGPSInformation_ObjetosResponse" />
+    </wsdl:message>
+    <wsdl:message name="ReceiveGPSInformationMassiveXMLSoapIn">
+        <wsdl:part name="parameters" element="tns:ReceiveGPSInformationMassiveXML" />
+    </wsdl:message>
+    <wsdl:message name="ReceiveGPSInformationMassiveXMLSoapOut">
+        <wsdl:part name="parameters" element="tns:ReceiveGPSInformationMassiveXMLResponse" />
+    </wsdl:message>
+    <wsdl:portType name="ReceiveGPSInfoSoap">
+        <wsdl:operation name="ReceiveGPSInformation">
+            <wsdl:input message="tns:ReceiveGPSInformationSoapIn" />
+            <wsdl:output message="tns:ReceiveGPSInformationSoapOut" />
+        </wsdl:operation>
+        <wsdl:operation name="ReceiveGPSInformation_Objeto">
+            <wsdl:input message="tns:ReceiveGPSInformation_ObjetoSoapIn" />
+            <wsdl:output message="tns:ReceiveGPSInformation_ObjetoSoapOut" />
+        </wsdl:operation>
+        <wsdl:operation name="ReceiveGPSInformation_Objetos">
+            <wsdl:input message="tns:ReceiveGPSInformation_ObjetosSoapIn" />
+            <wsdl:output message="tns:ReceiveGPSInformation_ObjetosSoapOut" />
+        </wsdl:operation>
+        <wsdl:operation name="ReceiveGPSInformationMassiveXML">
+            <wsdl:input message="tns:ReceiveGPSInformationMassiveXMLSoapIn" />
+            <wsdl:output message="tns:ReceiveGPSInformationMassiveXMLSoapOut" />
+        </wsdl:operation>
+    </wsdl:portType>
+    <wsdl:binding name="ReceiveGPSInfoSoap" type="tns:ReceiveGPSInfoSoap">
+        <soap:binding transport="http://schemas.xmlsoap.org/soap/http" />
+        <wsdl:operation name="ReceiveGPSInformation">
+            <soap:operation soapAction="http://tempuri.org/ReceiveGPSInformation" style="document" />
+            <wsdl:input>
+                <soap:body use="literal" />
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal" />
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="ReceiveGPSInformation_Objeto">
+            <soap:operation soapAction="http://tempuri.org/ReceiveGPSInformation_Objeto" style="document" />
+            <wsdl:input>
+                <soap:body use="literal" />
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal" />
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="ReceiveGPSInformation_Objetos">
+            <soap:operation soapAction="http://tempuri.org/ReceiveGPSInformation_Objetos" style="document" />
+            <wsdl:input>
+                <soap:body use="literal" />
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal" />
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="ReceiveGPSInformationMassiveXML">
+            <soap:operation soapAction="http://tempuri.org/ReceiveGPSInformationMassiveXML" style="document" />
+            <wsdl:input>
+                <soap:body use="literal" />
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal" />
+            </wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+    <wsdl:binding name="ReceiveGPSInfoSoap12" type="tns:ReceiveGPSInfoSoap">
+        <soap12:binding transport="http://schemas.xmlsoap.org/soap/http" />
+        <wsdl:operation name="ReceiveGPSInformation">
+            <soap12:operation soapAction="http://tempuri.org/ReceiveGPSInformation" style="document" />
+            <wsdl:input>
+                <soap12:body use="literal" />
+            </wsdl:input>
+            <wsdl:output>
+                <soap12:body use="literal" />
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="ReceiveGPSInformation_Objeto">
+            <soap12:operation soapAction="http://tempuri.org/ReceiveGPSInformation_Objeto" style="document" />
+            <wsdl:input>
+                <soap12:body use="literal" />
+            </wsdl:input>
+            <wsdl:output>
+                <soap12:body use="literal" />
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="ReceiveGPSInformation_Objetos">
+            <soap12:operation soapAction="http://tempuri.org/ReceiveGPSInformation_Objetos" style="document" />
+            <wsdl:input>
+                <soap12:body use="literal" />
+            </wsdl:input>
+            <wsdl:output>
+                <soap12:body use="literal" />
+            </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="ReceiveGPSInformationMassiveXML">
+            <soap12:operation soapAction="http://tempuri.org/ReceiveGPSInformationMassiveXML" style="document" />
+            <wsdl:input>
+                <soap12:body use="literal" />
+            </wsdl:input>
+            <wsdl:output>
+                <soap12:body use="literal" />
+            </wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+    <wsdl:service name="ReceiveGPSInfo">
+        <wsdl:port name="ReceiveGPSInfoSoap" binding="tns:ReceiveGPSInfoSoap">
+            <soap:address location="https://qintegrator.qs3.com.mx/ReceiveGPSInformation/ReceiveGPSInfo.asmx" />
+        </wsdl:port>
+        <wsdl:port name="ReceiveGPSInfoSoap12" binding="tns:ReceiveGPSInfoSoap12">
+            <soap12:address location="https://qintegrator.qs3.com.mx/ReceiveGPSInformation/ReceiveGPSInfo.asmx" />
+        </wsdl:port>
+    </wsdl:service>
+</wsdl:definitions>
