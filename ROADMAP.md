@@ -25,7 +25,7 @@
 **Tag:** `v0.1.0-phase0`
 
 | Status | Task |
-|---|---|
+|--|---|
 | ✅ | Spring Boot 3.5.14 + Maven + Java 21 project created |
 | ✅ | Package structure set to `com.fleetpulse.api` |
 | ✅ | Main application class renamed to `FleetPulseApiApplication` |
@@ -34,7 +34,7 @@
 | ✅ | WSDL copied to `src/main/resources/wsdl/ReceiveGPSInfo.wsdl` |
 | ✅ | `README.md` architectural blueprint added to project root |
 | ✅ | `target/` excluded from git, unnecessary Spring MVC folders removed |
-| ⬜ | GitHub repository created and initial commit pushed |
+| ✅ | GitHub repository created and initial commit pushed |
 
 ---
 
@@ -44,23 +44,28 @@
 
 | Status | Task |
 |---|---|
-| ⬜ | Create full package structure (domain, application, infrastructure) |
-| ⬜ | `FleetConstants.java` — `FLEET_TIMEZONE = ZoneId.of("America/Mexico_City")` |
-| ⬜ | `Role.java` — enum: ADMIN, USER |
-| ⬜ | `Unit.java` — aggregate root with `isWithinActiveWindow(LocalTime now)` |
-| ⬜ | `GpsReading.java` — immutable value object, validates in constructor |
-| ⬜ | `ScheduledPulse.java` — value object, assembled at dispatch, never persisted |
-| ⬜ | `InvalidCoordinateException.java` — thrown by `GpsReading` constructor |
-| ⬜ | `UnitNotFoundException.java` |
-| ⬜ | `GpsProviderUnavailableException.java` |
-| ⬜ | `PulseSendException.java` — thrown by `PulseSender` port |
-| ⬜ | Driving ports: `SendPulseUseCase`, `TestProviderUseCase`, `ManageUnitUseCase`, `ConfigureScheduleUseCase` |
-| ⬜ | Driven ports: `GpsCoordinateProvider`, `PulseSender`, `UnitRepository`, `UserRepository` |
-| ⬜ | ArchUnit dependency added to `pom.xml` (test scope) |
-| ⬜ | ArchUnit test — verify nothing in `domain/` or `application/` imports from `infrastructure/` |
-| ⬜ | Unit tests for `GpsReading` constructor validation (no Spring context) |
-| ⬜ | Unit tests for `Unit.isWithinActiveWindow()` (no Spring context) |
+| ✅ | Create full package structure (domain, application, infrastructure) |
+| ✅ | `FleetConstants.java` — `FLEET_TIMEZONE = ZoneId.of("America/Mexico_City")` |
+| ✅ | `Role.java` — enum: ADMIN, USER |
+| ✅ | `Unit.java` — aggregate root with `isWithinActiveWindow(LocalTime now)` |
+| ✅ | `GpsReading.java` — immutable value object, validates in constructor |
+| ✅ | `ScheduledPulse.java` — value object, assembled at dispatch, never persisted |
+| ✅ | `InvalidCoordinateException.java` — thrown by `GpsReading` constructor |
+| ✅ | `UnitNotFoundException.java` |
+| ✅ | `GpsProviderUnavailableException.java` |
+| ✅ | `PulseSendException.java` — thrown by `PulseSender` port |
+| ✅ | Driving ports: `SendPulseUseCase`, `TestProviderUseCase`, `ManageUnitUseCase`, `ConfigureScheduleUseCase` |
+| ✅ | Driven ports: `GpsCoordinateProvider`, `PulseSender`, `UnitRepository`, `UserRepository` |
+| ✅ | ArchUnit dependency added to `pom.xml` (test scope) |
+| ✅ | ArchUnit test — verify nothing in `domain/` or `application/` imports from `infrastructure/` |
+| ✅ | Unit tests for `GpsReading` constructor validation (no Spring context) |
+| ✅ | Unit tests for `Unit.isWithinActiveWindow()` (no Spring context) |
 
+**Notes:**
+- `ProviderType.java` added — enum `MANUAL / TRACCAR` required by `GpsReading`, not listed in original roadmap
+- `FleetpulseapiApplicationTests` disabled with `@Disabled("Requires database — enable in Phase 2")` — Spring context test deferred until datasource is available
+- `jaxws-maven-plugin` moved to `soap-codegen` Maven profile — SOAP stub generation is Phase 4, removed from default build cycle. Path bug in `<wsdlFile>` corrected in the same move.
+- `lombok-mapstruct-binding` added to `annotationProcessorPaths` — prevents compilation errors in Phase 2+ when MapStruct mappers reference Lombok-annotated infrastructure classes
 ---
 
 ## Phase 2 — Persistence
