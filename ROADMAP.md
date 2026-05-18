@@ -73,14 +73,14 @@
 **Exit condition:** 5 units seed correctly. Repository adapters return domain objects. DB round-trip validated.
 
 | Status | Task |
-|---|---|
-| ⬜ | `application.properties` — bind all environment variables (`QSOLUTIONS_*`, `JWT_*`, `GPS_*`, `SPRING_DATASOURCE_*`) |
-| ⬜ | `V1__schema.sql` — units and users tables (no `DEFAULT CURRENT_TIMESTAMP` on `pulse_log`) |
-| ⬜ | `V2__seed_units.sql` — 5 fleet units seeded (Peugeot, Kangoo, Tr-02, Attitude, Sentra) |
-| ⬜ | `UnitEntity.java` + `UserEntity.java` — JPA entities, never exposed outside infrastructure |
-| ⬜ | `UnitJpaAdapter.java` implements `UnitRepository` — returns domain objects only |
-| ⬜ | `UserJpaAdapter.java` implements `UserRepository` — returns domain objects only |
-| ⬜ | Validate DB round-trip — save Unit, retrieve Unit, assert domain fields match |
+|--|---|
+| ✅ | `application.properties` — bind all environment variables (`QSOLUTIONS_*`, `JWT_*`, `GPS_*`, `SPRING_DATASOURCE_*`) |
+| ✅ | `V1__schema.sql` — units and users tables (no `DEFAULT CURRENT_TIMESTAMP` on `pulse_log`) |
+| ✅ | `V2__seed_units.sql` — 5 fleet units seeded (Peugeot, Kangoo, Tr-02, Attitude, Sentra) |
+| ✅ | `UnitEntity.java` + `UserEntity.java` — JPA entities, never exposed outside infrastructure |
+| ✅ | `UnitJpaAdapter.java` implements `UnitRepository` — returns domain objects only |
+| ✅ | `UserJpaAdapter.java` implements `UserRepository` — returns domain objects only |
+| ✅ | Validate DB round-trip — save Unit, retrieve Unit, assert domain fields match |
 
 ---
 

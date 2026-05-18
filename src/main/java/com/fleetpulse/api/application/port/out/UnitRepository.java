@@ -9,6 +9,6 @@ public interface UnitRepository {
     Unit save(Unit unit);
     Optional<Unit> findByNumUnidad(String numUnidad);
     List<Unit> findAll();
-    void deleteByNumUnidad(String numUnidad);
+    void deactivateByNumUnidad(String numUnidad);
     boolean existsByNumUnidad(String numUnidad);
 }

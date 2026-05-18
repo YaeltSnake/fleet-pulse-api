@@ -1,5 +1,16 @@
 package com.fleetpulse.api.application.port.out;
 
+import com.fleetpulse.api.domain.model.User;
+
+import java.util.List;
+import java.util.Optional;
+
 public interface UserRepository {
-    // TODO: To be defined in Phase 3 — Security + Auth
+
+    User save(User user);
+    Optional<User> findByUsername(String username);
+    List<User> findAll();
+    void deactivateByUsername(String username);
+    boolean existsByUsername(String username);
+
 }
