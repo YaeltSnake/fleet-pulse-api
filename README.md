@@ -594,6 +594,9 @@ control. All sensitive and deployment-specific values are supplied at runtime.
 | Pulse result logging | Phase 1 — SLF4J/Logback only | No frontend consumer until Phase 8; `pulse_log` table deferred |
 | Browser Geolocation API | Deferred — future `GpsCoordinateProvider` implementation | Requires open browser tab; not reliable for field operators |
 | DB relations | None between units and users | Units are independent; no assignment model |
+| JWT algorithm | HS256 | Single service — no cross-service token verification required. Migrate to RS256 when microservices are introduced |
+| Refresh token storage | DB table (refresh_tokens) | Survives restarts, enables revocation. Stateless approach rejected — logout must be real |
+| Token revocation | Redis blacklist with TTL | Avoids DB query on every request. TTL matches access token expiry. Failover strategy: fail closed |
 
 ### Behavioral Change from Production
 

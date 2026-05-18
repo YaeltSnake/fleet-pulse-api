@@ -4,7 +4,7 @@ services:
     container_name: fleet-pulse-mysql
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "fleetpulse", "-pfleetpulse123"]
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u $$MYSQL_USER -p$$MYSQL_PASSWORD" ]
       interval: 10s
       timeout: 5s
       retries: 5

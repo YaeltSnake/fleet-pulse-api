@@ -1,5 +1,6 @@
 package com.fleetpulse.api.infrastructure.adapter.out.persistence;
 
+import com.fleetpulse.api.domain.exception.UnitNotFoundException;
 import com.fleetpulse.api.domain.model.Unit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,24 +40,20 @@ public class UnitJpaAdapterTest {
         assertThat(result.get().isActive()).isTrue();
         assertThat(result.get().isHorarioFijo()).isFalse();
         assertThat(result.get().getHoraFin()).isEqualTo(LocalTime.of(18,0));
-        assertThat(result.get().getTrackingNumber()).isEqualTo(null);
+        assertThat(result.get().getTrackingNumber()).isNull();
     }
 
     @Test
     void findAll_returnsAllSavedUnits() {
-        Unit unit2 = new Unit("TestUnit2", false,
-                LocalTime.of(10,0), LocalTime.of(20,0),
-                null, true);
-        Unit unit3 = new Unit("TestUnit3", false,
-                LocalTime.of(11,0), LocalTime.of(22,0),
-                null, true);
-
-        adapter.save(unit2);
-        adapter.save(unit3);
+        adapter.save(new Unit("TestUnit2", false,
+                LocalTime.of(10,0), LocalTime.of(20,0), null, true));
+        adapter.save(new Unit("TestUnit3", false,
+                LocalTime.of(11,0), LocalTime.of(22,0), null, true));
 
         List<Unit> units = adapter.findAll();
 
         assertThat(units).hasSize(2);
+        assertThat(units.getFirst().getNumUnidad()).isEqualTo("TestUnit2");
     }
 
     @Test
@@ -87,6 +84,7 @@ public class UnitJpaAdapterTest {
         adapter.deactivateByNumUnidad("TestUnit2");
         Optional<Unit> result = adapter.findByNumUnidad("TestUnit2");
 
+        assertThat(result).isPresent();
         assertThat(result.get().isActive()).isFalse();
     }
 
@@ -94,6 +92,12 @@ public class UnitJpaAdapterTest {
     void findByNumUnidad_returnsEmptyWhenNotFound() {
         Optional<Unit> result = adapter.findByNumUnidad("Empty");
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void desactivateByNumunidad_throwsWhenNotFound(){
+        assertThatThrownBy(() -> adapter.deactivateByNumUnidad("Nonexistent"))
+                .isInstanceOf(UnitNotFoundException.class);
     }
 
 }
