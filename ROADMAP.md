@@ -91,11 +91,11 @@
 ### Layer 1 — Infrastructure dependencies
 
 | Status | Task |
-|---|---|
-| ⬜ | Add Redis service to `docker-compose.yml` — `redis:7-alpine`, port 6379 |
-| ⬜ | Add `spring-boot-starter-data-redis` to `pom.xml` |
-| ⬜ | Confirm JJWT is present in `pom.xml` at correct version (`jjwt-api`, `jjwt-impl`, `jjwt-jackson`) |
-| ⬜ | Add `REDIS_HOST`, `REDIS_PORT` to `application.properties` and `.env` |
+|--|---|
+| ✅ | Add Redis service to `docker-compose.yml` — `redis:7-alpine`, port 6379 |
+| ✅ | Add `spring-boot-starter-data-redis` to `pom.xml` |
+| ✅ | Confirm JJWT is present in `pom.xml` at correct version (`jjwt-api`, `jjwt-impl`, `jjwt-jackson`) |
+| ✅ | Add `REDIS_HOST`, `REDIS_PORT` to `application.properties` and `.env` |
 | ⬜ | `V3__refresh_tokens.sql` — fields: `id`, `token`, `username`, `expires_at`, `revoked`, `created_at`; indexes on `token` and `username` |
 
 ### Layer 2 — Domain additions

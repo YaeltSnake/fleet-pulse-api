@@ -18,5 +18,17 @@ services:
     volumes:
       - fleet-pulse-mysql-data:/var/lib/mysql
 
+  redis:
+    image: redis:7-alpine
+    container_name: fleet-pulse-redis
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "6379:6379"
+
 volumes:
   fleet-pulse-mysql-data:
