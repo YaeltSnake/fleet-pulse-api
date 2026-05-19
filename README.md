@@ -30,11 +30,12 @@ A **React frontend** is planned as a separate project once the API contract is s
 | Database | MySQL | 8.0+ |
 | Schema migrations | Flyway | bundled with Spring Boot |
 | Security | Spring Security + JWT | — |
+| Cache / Token blacklist | Redis | 7.x |
 | SOAP transport | JAX-WS Metro (`jaxws-rt`) | 4.0.2 |
 | SOAP stubs | Generated via `wsimport` | — |
 | GPS provider — Phase 1 | Manual input | — |
 | GPS provider — Phase 2 | Traccar Client (Android) | — |
-| Testing | JUnit 5 + Mockito | — |
+| Testing | JUnit 5 + Mockito + Testcontainers | — |
 | IDE | IntelliJ IDEA | 2026.1.1 |
 
 ---
@@ -90,6 +91,7 @@ com.fleetpulse.api
 │   │   ├── Unit.java                        # aggregate root
 │   │   ├── GpsReading.java                  # immutable value object — validates in constructor
 │   │   ├── ScheduledPulse.java              # value object, assembled at dispatch, never persisted
+│   │   ├── RefreshToken.java                # value object: token, username, expiresAt, revoked
 │   │   └── Role.java                        # enum: ADMIN, USER
 │   └── exception/
 │       ├── UnitNotFoundException.java
@@ -107,8 +109,13 @@ com.fleetpulse.api
 │   │       ├── GpsCoordinateProvider.java
 │   │       ├── PulseSender.java
 │   │       ├── UnitRepository.java
-│   │       └── UserRepository.java
+│   │       ├── UserRepository.java
+│   │       ├── RefreshTokenRepository.java
+│   │       ├── TokenBlacklist.java
+│   │       └── TokenService.java            # abstracts JWT generation/validation from AuthService
 │   └── service/
+│       ├── AuthService.java
+│       ├── UserManagementService.java
 │       ├── PulseOrchestrationService.java
 │       ├── UnitManagementService.java
 │       └── ProviderTestService.java
@@ -117,6 +124,8 @@ com.fleetpulse.api
     ├── adapter/
     │   ├── in/
     │   │   └── web/
+    │   │       ├── AuthController.java
+    │   │       ├── UserController.java
     │   │       ├── UnitController.java
     │   │       ├── PulseController.java
     │   │       ├── TraccarPositionController.java   # receives GPS push from Traccar Client
@@ -130,12 +139,22 @@ com.fleetpulse.api
     │       │   └── TraccarCoordinateAdapter.java
     │       ├── cache/
     │       │   └── GpsPositionCache.java            # ConcurrentHashMap<String, GpsReading>
-    │       └── persistence/
-    │           ├── UnitJpaAdapter.java
-    │           ├── UserJpaAdapter.java
-    │           └── entity/
-    │               ├── UnitEntity.java
-    │               └── UserEntity.java
+    │       ├── persistence/
+    │       │   ├── UnitJpaAdapter.java
+    │       │   ├── UserJpaAdapter.java
+    │       │   ├── RefreshTokenJpaAdapter.java
+    │       │   └── entity/
+    │       │       ├── UnitEntity.java
+    │       │       ├── UserEntity.java
+    │       │       └── RefreshTokenEntity.java
+    │       └── redis/
+    │           └── RedisTokenBlacklistAdapter.java  # implements TokenBlacklist; TTL = remaining token lifetime
+    ├── security/
+    │   ├── JwtService.java                          # implements TokenService; uses JJWT — infrastructure only
+    │   ├── JwtAuthenticationFilter.java
+    │   └── UserDetailsServiceImpl.java
+    ├── init/
+    │   └── AdminUserInitializer.java                # ApplicationRunner; creates first ADMIN from env
     ├── scheduler/
     │   └── PulseSchedulerService.java
     └── config/
@@ -281,6 +300,45 @@ When the endpoint returns `Protocolo.isProcessed() == false`, the adapter wraps
 **`UnitRepository`** / **`UserRepository`**
 Standard persistence contracts. Return domain objects only — never JPA entities. The application
 layer has no knowledge of `UnitEntity` or `UserEntity`.
+
+**`RefreshTokenRepository`**
+
+```
+Optional<RefreshToken> findByToken(String token)
+RefreshToken           save(RefreshToken token)
+void                   revokeByToken(String token)
+void                   deleteAllExpired()
+```
+
+Persistence contract for the `refresh_tokens` table. Returns domain objects only. The adapter
+(`RefreshTokenJpaAdapter`) handles mapping to/from `RefreshTokenEntity`.
+
+**`TokenBlacklist`**
+
+```
+void    blacklist(String token, Duration remainingTtl)
+boolean isBlacklisted(String token)
+```
+
+Redis-backed blacklist for revoked access tokens. `remainingTtl` must be the remaining lifetime
+of the specific token being blacklisted — not a fixed value. This prevents a near-expired token
+from occupying Redis for its full configured maximum. Failover strategy: fail closed — if Redis
+is unreachable, `isBlacklisted()` throws and the request is rejected.
+
+**`TokenService`**
+
+```
+String   generateAccessToken(String username, String role)
+String   generateRefreshToken(String username)
+String   extractUsername(String token)
+boolean  isTokenValid(String token, String username)
+Duration remainingTtl(String token)
+```
+
+Abstracts all JWT operations from `AuthService`. This port exists to keep `AuthService` free of
+JJWT imports and to satisfy the hexagonal constraint. `JwtService` in `infrastructure/security/`
+is the sole implementation. If the JWT library is replaced, only `JwtService` changes —
+`AuthService` and all application-layer tests are unaffected.
 
 ---
 
@@ -470,7 +528,12 @@ from the production app's `javax.*` stubs to `jakarta.*` is handled automaticall
 |---|---|---|---|
 | `POST /api/auth/login` | — | — | ✓ |
 | `POST /api/auth/refresh` | — | — | ✓ |
+| `POST /api/auth/logout` | ✓ | ✓ | — |
 | `GET /api/gps/position` | — | — | ✓ (Traccar push) |
+| `GET /api/users` | ✓ | — | — |
+| `POST /api/users` | ✓ | — | — |
+| `PUT /api/users/{id}` | ✓ | — | — |
+| `DELETE /api/users/{id}` | ✓ | — | — |
 | `GET /api/units` | ✓ | ✓ | — |
 | `POST /api/units` | ✓ | — | — |
 | `PUT /api/units/{id}` | ✓ | — | — |
@@ -527,13 +590,32 @@ INSERT INTO units (num_unidad, horario_fijo, hora_inicio, hora_fin) VALUES
 `num_unidad` values must match QSolutions nomenclature exactly as registered in their system. Do
 not modify these values without confirming with QSolutions.
 
-### Deferred Table — `V3__pulse_log.sql` — Phase 8 only
+### Phase 3 — `V3__refresh_tokens.sql`
+
+```sql
+CREATE TABLE refresh_tokens (
+    id         BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    token      VARCHAR(512) NOT NULL,
+    username   VARCHAR(100) NOT NULL,
+    expires_at DATETIME     NOT NULL,
+    revoked    BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_refresh_tokens_token    (token),
+    INDEX idx_refresh_tokens_username (username)
+);
+```
+
+The `token` index supports O(1) lookup on every refresh and logout request. The `username`
+index supports bulk revocation (e.g. forced logout of all sessions for a user). Both are
+required — do not omit them.
+
+### Deferred Table — `V4__pulse_log.sql` — Phase 8 only
 
 The following schema is defined here for completeness. **Do not create this table before Phase 8.**
 Creating it without a consumer adds schema overhead with no benefit.
 
 ```sql
--- Create in V3__pulse_log.sql when React frontend is built (Phase 8)
+-- Create in V4__pulse_log.sql when React frontend is built (Phase 8)
 CREATE TABLE pulse_log (
     id         BIGINT        AUTO_INCREMENT PRIMARY KEY,
     num_unidad VARCHAR(100)  NOT NULL,
@@ -566,6 +648,9 @@ control. All sensitive and deployment-specific values are supplied at runtime.
 | `SPRING_DATASOURCE_URL` | JDBC connection string | `jdbc:mysql://localhost:3306/fleet_pulse` |
 | `SPRING_DATASOURCE_USERNAME` | Database user | — |
 | `SPRING_DATASOURCE_PASSWORD` | Database password | — |
+| `REDIS_HOST` | Redis hostname for token blacklist | `localhost` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `INITIAL_ADMIN_PASSWORD` | Password for first ADMIN user created by `AdminUserInitializer` on startup. Required — application fails fast with clear error if absent and no ADMIN exists. | — |
 | `GPS_MAX_COORDINATE_AGE_SECONDS` | Staleness threshold for cached coordinates | `300` |
 
 ---
@@ -597,6 +682,9 @@ control. All sensitive and deployment-specific values are supplied at runtime.
 | JWT algorithm | HS256 | Single service — no cross-service token verification required. Migrate to RS256 when microservices are introduced |
 | Refresh token storage | DB table (refresh_tokens) | Survives restarts, enables revocation. Stateless approach rejected — logout must be real |
 | Token revocation | Redis blacklist with TTL | Avoids DB query on every request. TTL matches access token expiry. Failover strategy: fail closed |
+| `JwtService` placement | `infrastructure/security/` — implements `TokenService` port | Imports JJWT directly; placing it in `application/` would violate the hexagonal constraint and break ArchUnit. `AuthService` calls it through the `TokenService` port. |
+| Role authority prefix | No `ROLE_` prefix — `hasAuthority()` not `hasRole()` | `hasRole()` prepends `ROLE_` automatically; `hasAuthority()` matches the stored enum value (`ADMIN`, `USER`) directly. Inconsistency causes silent auth bypass. |
+| `TokenService` port | Defined in `application/port/out/` | Keeps `AuthService` free of JJWT imports. If JWT library is replaced, only `JwtService` changes — `AuthService` and all application-layer tests are unaffected. |
 
 ### Behavioral Change from Production
 
@@ -627,7 +715,7 @@ may be skipped.
 | **5** | `ManualCoordinateAdapter` + `PulseOrchestrationService` + global `@Scheduled` tick + `POST /api/units/{numUnidad}/pulse/force`. | Pulses dispatch on the 15-minute cycle for active units within their window. Force-dispatch endpoint works. Skip conditions (`SKIPPED_OUT_OF_WINDOW`, `SKIPPED_NO_COORDINATES`) log correctly. **Production replacement milestone — see below.** |
 | **6** | `TraccarPositionController` + `GpsPositionCache` + `TraccarCoordinateAdapter`. | Controller receives Traccar OsmAnd GET, constructs valid `GpsReading`, stores in cache. `TraccarCoordinateAdapter.getCoordinates()` returns cache contents. `SKIPPED_STALE` fires after 300 s without a refresh. Full flow tested with Mockito before real devices. |
 | **7** | `UnitController` + `ProviderTestController` + `TestProviderUseCase` dry-run endpoint. | All endpoints in the authorization matrix respond correctly. `GET /api/units/{numUnidad}/pulse/test` returns a `GpsReading` with zero `PulseSender` invocations (verified in tests). API contract is stable for React consumption. |
-| **8** | React frontend + `V3__pulse_log.sql` Flyway migration. | Deferred. Begins only after Phase 7 is stable in a deployed environment. |
+| **8** | React frontend + `V4__pulse_log.sql` Flyway migration. | Deferred. Begins only after Phase 7 is stable in a deployed environment. |
 
 ### Production Replacement Milestone — End of Phase 5
 

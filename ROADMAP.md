@@ -86,18 +86,73 @@
 
 ## Phase 3 — Security + Auth
 **Tag:** `v0.3.0`
-**Exit condition:** ADMIN and USER roles enforce the authorization matrix. No endpoint reachable without valid token except `/api/auth/*`. First ADMIN user can be created.
+**Exit condition:** ADMIN and USER roles enforce the authorization matrix. No endpoint reachable without valid token except `/api/auth/*`. Login returns access token + refresh token. Logout blacklists access token in Redis AND marks refresh token as `revoked = true` in DB. First ADMIN provisioned via `AdminUserInitializer` on startup. All tests pass.
+
+### Layer 1 — Infrastructure dependencies
 
 | Status | Task |
 |---|---|
-| ⬜ | `SecurityConfig.java` — endpoint authorization matrix |
-| ⬜ | JWT access token (15 min) + refresh token (7 days) |
-| ⬜ | `POST /api/auth/login` |
-| ⬜ | `POST /api/auth/refresh` |
-| ⬜ | User CRUD — create, deactivate, list (ADMIN only) |
-| ⬜ | `UserManagementService.java` |
-| ⬜ | `UserController.java` |
-| ⬜ | Seed script or endpoint to provision first ADMIN user before Phase 5 goes live |
+| ⬜ | Add Redis service to `docker-compose.yml` — `redis:7-alpine`, port 6379 |
+| ⬜ | Add `spring-boot-starter-data-redis` to `pom.xml` |
+| ⬜ | Confirm JJWT is present in `pom.xml` at correct version (`jjwt-api`, `jjwt-impl`, `jjwt-jackson`) |
+| ⬜ | Add `REDIS_HOST`, `REDIS_PORT` to `application.properties` and `.env` |
+| ⬜ | `V3__refresh_tokens.sql` — fields: `id`, `token`, `username`, `expires_at`, `revoked`, `created_at`; indexes on `token` and `username` |
+
+### Layer 2 — Domain additions
+
+| Status | Task |
+|---|---|
+| ⬜ | Add setters to `User.java` (deferred from Phase 2; required by `UserManagementService`) |
+| ⬜ | `RefreshToken.java` — value object in `domain/model/`: fields `token`, `username`, `expiresAt`, `revoked` (no `id` — infrastructure concern) |
+| ⬜ | `RefreshTokenRepository` port in `application/port/out/` — `findByToken`, `save`, `revokeByToken`, `deleteAllExpired` |
+| ⬜ | `TokenBlacklist` port in `application/port/out/` — `blacklist(String token, Duration remainingTtl)`, `isBlacklisted(String token)` |
+| ⬜ | `TokenService` port in `application/port/out/` — `generateAccessToken`, `generateRefreshToken`, `extractUsername`, `isTokenValid`, `remainingTtl` (keeps `AuthService` free of JJWT imports) |
+
+### Layer 3 — Application services
+
+| Status | Task |
+|---|---|
+| ⬜ | `AuthService.java` in `application/service/` — login (verify password, issue access + refresh tokens), refresh (validate refresh token, issue new access token), logout (blacklist access token in Redis AND revoke refresh token in DB) |
+| ⬜ | `UserManagementService.java` in `application/service/` — ADMIN-only: create user, deactivate user, list users |
+| ⬜ | Both services call only ports — zero Spring, JJWT, or JPA imports |
+
+### Layer 4 — Infrastructure / Security
+
+| Status | Task |
+|---|---|
+| ⬜ | `JwtService.java` in `infrastructure/security/` — implements `TokenService` port; HS256 signing via JJWT; key from `JWT_SECRET` env var |
+| ⬜ | `JwtAuthenticationFilter.java` — `OncePerRequestFilter`; extracts Bearer token, checks blacklist, sets `SecurityContextHolder` |
+| ⬜ | `UserDetailsServiceImpl.java` — implements Spring `UserDetailsService`; loads user via `UserRepository` port |
+| ⬜ | `SecurityConfig.java` — full authorization matrix; `hasAuthority()` (no `ROLE_` prefix); stateless session; `/api/auth/**` and `/api/gps/position` are the only public paths |
+| ⬜ | `BCryptPasswordEncoder` bean declared in `SecurityConfig` |
+| ⬜ | `RefreshTokenJpaAdapter.java` + `RefreshTokenEntity.java` — implements `RefreshTokenRepository`; maps between domain `RefreshToken` and `RefreshTokenEntity` |
+| ⬜ | `RedisTokenBlacklistAdapter.java` — implements `TokenBlacklist`; TTL set to `remainingTtl` argument (not fixed value); fail closed on Redis unavailable |
+
+### Layer 5 — Controllers + DTOs
+
+| Status | Task |
+|---|---|
+| ⬜ | `AuthController.java` — `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout` |
+| ⬜ | `UserController.java` — ADMIN-only: `GET /api/users`, `POST /api/users`, `PUT /api/users/{id}`, `DELETE /api/users/{id}` |
+| ⬜ | DTOs: `LoginRequest`, `LoginResponse`, `RefreshRequest`, `RefreshResponse`, `CreateUserRequest`, `UserResponse` |
+| ⬜ | Global `@ControllerAdvice` — RFC 7807 `application/problem+json` error responses for all 4xx/5xx; no Spring whitelabel error page |
+
+### Layer 6 — First ADMIN
+
+| Status | Task |
+|---|---|
+| ⬜ | `AdminUserInitializer.java` — `ApplicationRunner`; checks if any ADMIN exists via `UserRepository`; if not, reads `INITIAL_ADMIN_PASSWORD` from env — fail fast with `IllegalStateException` if absent; BCrypt-hashes and inserts via `UserRepository` |
+
+### Layer 7 — Tests
+
+| Status | Task |
+|---|---|
+| ⬜ | `AuthControllerTest` — `@SpringBootTest` + `MockMvc`: correct login, wrong credentials, expired access token, logout then immediate reuse of blacklisted token returns 401 |
+| ⬜ | `JwtServiceTest` — token generation and validation; no Spring context |
+| ⬜ | `RefreshTokenJpaAdapterTest` — DB round-trip; `@DataJpaTest` |
+| ⬜ | `RedisTokenBlacklistAdapterTest` — blacklist write and TTL expiry; Testcontainers `redis:7-alpine` |
+| ⬜ | `UserManagementServiceTest` — create, deactivate, list with roles; Mockito, no Spring context |
+| ⬜ | `AdminUserInitializerTest` — ADMIN created when none exists; no duplicate on second run; `IllegalStateException` thrown when `INITIAL_ADMIN_PASSWORD` not set |
 
 ---
 
@@ -175,7 +230,7 @@
 
 | Status | Task |
 |---|---|
-| ⬜ | `V3__pulse_log.sql` Flyway migration |
+| ⬜ | `V4__pulse_log.sql` Flyway migration |
 | ⬜ | Pulse log write on every dispatch result (SENT, SKIPPED, REJECTED, ERROR) |
 | ⬜ | React project initialized |
 | ⬜ | Authentication flow — login, access token storage, refresh |
