@@ -37,4 +37,23 @@ public class User {
         return active;
     }
 
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
 }

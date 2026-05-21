@@ -96,17 +96,17 @@
 | ✅ | Add `spring-boot-starter-data-redis` to `pom.xml` |
 | ✅ | Confirm JJWT is present in `pom.xml` at correct version (`jjwt-api`, `jjwt-impl`, `jjwt-jackson`) |
 | ✅ | Add `REDIS_HOST`, `REDIS_PORT` to `application.properties` and `.env` |
-| ⬜ | `V3__refresh_tokens.sql` — fields: `id`, `token`, `username`, `expires_at`, `revoked`, `created_at`; indexes on `token` and `username` |
+| ✅ | `V3__refresh_tokens.sql` — fields: `id`, `token`, `username`, `expires_at`, `revoked`, `created_at`; indexes on `token` and `username` |
 
 ### Layer 2 — Domain additions
 
 | Status | Task |
-|---|---|
-| ⬜ | Add setters to `User.java` (deferred from Phase 2; required by `UserManagementService`) |
-| ⬜ | `RefreshToken.java` — value object in `domain/model/`: fields `token`, `username`, `expiresAt`, `revoked` (no `id` — infrastructure concern) |
-| ⬜ | `RefreshTokenRepository` port in `application/port/out/` — `findByToken`, `save`, `revokeByToken`, `deleteAllExpired` |
-| ⬜ | `TokenBlacklist` port in `application/port/out/` — `blacklist(String token, Duration remainingTtl)`, `isBlacklisted(String token)` |
-| ⬜ | `TokenService` port in `application/port/out/` — `generateAccessToken`, `generateRefreshToken`, `extractUsername`, `isTokenValid`, `remainingTtl` (keeps `AuthService` free of JJWT imports) |
+|--|---|
+| ✅ | Add setters to `User.java` (deferred from Phase 2; required by `UserManagementService`) |
+| ✅ | `RefreshToken.java` — value object in `domain/model/`: fields `token`, `username`, `expiresAt`, `revoked` (no `id` — infrastructure concern) |
+| ✅ | `RefreshTokenRepository` port in `application/port/out/` — `findByToken`, `save`, `revokeByToken`, `deleteAllExpired` |
+| ✅ | `TokenBlacklist` port in `application/port/out/` — `blacklist(String token, Duration remainingTtl)`, `isBlacklisted(String token)` |
+| ✅ | `TokenService` port in `application/port/out/` — `generateAccessToken`, `generateRefreshToken`, `extractUsername`, `isTokenValid`, `remainingTtl` (keeps `AuthService` free of JJWT imports) |
 
 ### Layer 3 — Application services
 
