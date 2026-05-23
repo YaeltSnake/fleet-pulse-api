@@ -4,17 +4,17 @@ import java.time.Instant;
 
 public class RefreshToken {
 
-    private String token;
-    private String username;
-    private Instant expiresAt;
-    private boolean revoked;
+    private final String token;
+    private final Long userId;
+    private final Instant expiresAt;
+    private final boolean revoked;
 
     public RefreshToken(String token,
-                        String username,
+                        Long userId,
                         Instant expiresAt,
                         boolean revoked) {
         this.token = token;
-        this.username = username;
+        this.userId = userId;
         this.expiresAt = expiresAt;
         this.revoked = revoked;
     }
@@ -23,8 +23,8 @@ public class RefreshToken {
         return token;
     }
 
-    public String getUsername() {
-        return username;
+    public Long getUserId() {
+        return userId;
     }
 
     public Instant getExpiresAt() {
@@ -33,10 +33,6 @@ public class RefreshToken {
 
     public boolean isRevoked() {
         return revoked;
-    }
-
-    public void setRevoked(boolean revoked) {
-        this.revoked = revoked;
     }
 
 }

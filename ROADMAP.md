@@ -97,24 +97,25 @@
 | ✅ | Confirm JJWT is present in `pom.xml` at correct version (`jjwt-api`, `jjwt-impl`, `jjwt-jackson`) |
 | ✅ | Add `REDIS_HOST`, `REDIS_PORT` to `application.properties` and `.env` |
 | ✅ | `V3__refresh_tokens.sql` — fields: `id`, `token`, `username`, `expires_at`, `revoked`, `created_at`; indexes on `token` and `username` |
+| ✅ | `V4__refresh_tokens_userid.sql` — migrates `username` → `user_id BIGINT` FK to `users(id)`; index on `user_id` |
 
 ### Layer 2 — Domain additions
 
 | Status | Task |
 |--|---|
-| ✅ | Add setters to `User.java` (deferred from Phase 2; required by `UserManagementService`) |
-| ✅ | `RefreshToken.java` — value object in `domain/model/`: fields `token`, `username`, `expiresAt`, `revoked` (no `id` — infrastructure concern) |
+| ✅ | `User.java` made fully immutable — all fields `final`, setters removed, `UserManagementService` uses command pattern (`CreateUserCommand`, `UpdateUserCommand`) |
+| ✅ | `RefreshToken.java` — value object in `domain/model/`: fields `token`, `userId`, `expiresAt`, `revoked` (no `id` — infrastructure concern) |
 | ✅ | `RefreshTokenRepository` port in `application/port/out/` — `findByToken`, `save`, `revokeByToken`, `deleteAllExpired` |
 | ✅ | `TokenBlacklist` port in `application/port/out/` — `blacklist(String token, Duration remainingTtl)`, `isBlacklisted(String token)` |
-| ✅ | `TokenService` port in `application/port/out/` — `generateAccessToken`, `generateRefreshToken`, `extractUsername`, `isTokenValid`, `remainingTtl` (keeps `AuthService` free of JJWT imports) |
+| ✅ | `TokenService` port in `application/port/out/` — `generateAccessToken(Long userId, String role)`, `generateRefreshToken(Long userId)`, `extractUserId(String token)`, `isTokenValid(String token, Long userId)`, `remainingTtl(String token)`, `refreshTokenExpiresAt()` (keeps `AuthService` free of JJWT imports) |
 
 ### Layer 3 — Application services
 
 | Status | Task |
 |---|---|
-| ⬜ | `AuthService.java` in `application/service/` — login (verify password, issue access + refresh tokens), refresh (validate refresh token, issue new access token), logout (blacklist access token in Redis AND revoke refresh token in DB) |
-| ⬜ | `UserManagementService.java` in `application/service/` — ADMIN-only: create user, deactivate user, list users |
-| ⬜ | Both services call only ports — zero Spring, JJWT, or JPA imports |
+| ✅ | `AuthService.java` in `application/service/` — login (verify password, issue access + refresh tokens), refresh (validate refresh token, issue new access token), logout (blacklist access token in Redis AND revoke refresh token in DB) |
+| ✅ | `UserManagementService.java` in `application/service/` — ADMIN-only: create user, deactivate user, list users |
+| ✅ | Both services call only ports — zero Spring, JJWT, or JPA imports |
 
 ### Layer 4 — Infrastructure / Security
 
@@ -230,7 +231,7 @@
 
 | Status | Task |
 |---|---|
-| ⬜ | `V4__pulse_log.sql` Flyway migration |
+| ⬜ | `V5__pulse_log.sql` Flyway migration |
 | ⬜ | Pulse log write on every dispatch result (SENT, SKIPPED, REJECTED, ERROR) |
 | ⬜ | React project initialized |
 | ⬜ | Authentication flow — login, access token storage, refresh |

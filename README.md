@@ -91,12 +91,19 @@ com.fleetpulse.api
 │   │   ├── Unit.java                        # aggregate root
 │   │   ├── GpsReading.java                  # immutable value object — validates in constructor
 │   │   ├── ScheduledPulse.java              # value object, assembled at dispatch, never persisted
-│   │   ├── RefreshToken.java                # value object: token, username, expiresAt, revoked
+│   │   ├── RefreshToken.java                # value object: token, userId, expiresAt, revoked
 │   │   └── Role.java                        # enum: ADMIN, USER
 │   └── exception/
 │       ├── UnitNotFoundException.java
 │       ├── InvalidCoordinateException.java  # thrown by GpsReading constructor
-│       └── GpsProviderUnavailableException.java
+│       ├── GpsProviderUnavailableException.java
+│       ├── UserNotFoundException.java
+│       ├── UserNotActiveException.java
+│       ├── InvalidCredentialsException.java
+│       ├── RefreshTokenNotFoundException.java
+│       ├── RefreshTokenExpiredException.java
+│       ├── RefreshTokenRevokedException.java
+│       └── UsernameAlreadyExistsException.java
 │
 ├── application/
 │   ├── port/
@@ -328,11 +335,12 @@ is unreachable, `isBlacklisted()` throws and the request is rejected.
 **`TokenService`**
 
 ```
-String   generateAccessToken(String username, String role)
-String   generateRefreshToken(String username)
-String   extractUsername(String token)
-boolean  isTokenValid(String token, String username)
+String   generateAccessToken(Long userId, String role)
+String   generateRefreshToken(Long userId)
+Long     extractUserId(String token)
+boolean  isTokenValid(String token, Long userId)
 Duration remainingTtl(String token)
+Instant  refreshTokenExpiresAt()
 ```
 
 Abstracts all JWT operations from `AuthService`. This port exists to keep `AuthService` free of
@@ -605,17 +613,40 @@ CREATE TABLE refresh_tokens (
 );
 ```
 
-The `token` index supports O(1) lookup on every refresh and logout request. The `username`
-index supports bulk revocation (e.g. forced logout of all sessions for a user). Both are
-required — do not omit them.
+The `token` index supports O(1) lookup on every refresh and logout request.
 
-### Deferred Table — `V4__pulse_log.sql` — Phase 8 only
+### Phase 3 — `V4__refresh_tokens_userid.sql`
+
+Migrates `refresh_tokens.username` to `user_id BIGINT FK → users.id`, consistent with the
+JWT `sub` = `Long userId` identity model. Refresh tokens now identify users by their stable
+surrogate key — username changes (future scope) will not invalidate issued tokens.
+
+```sql
+ALTER TABLE refresh_tokens
+    DROP INDEX idx_refresh_tokens_username,
+    DROP COLUMN username;
+
+ALTER TABLE refresh_tokens
+    ADD COLUMN user_id BIGINT NOT NULL DEFAULT 0,
+    ADD INDEX idx_refresh_tokens_user_id (user_id),
+    ADD CONSTRAINT fk_refresh_tokens_users
+        FOREIGN KEY (user_id) REFERENCES users(id);
+
+ALTER TABLE refresh_tokens
+    ALTER COLUMN user_id DROP DEFAULT;
+```
+
+The `user_id` index supports bulk revocation (e.g. forced logout of all sessions for a user).
+The FK to `users(id)` enforces referential integrity. No `ON DELETE` clause — defaults to
+`RESTRICT`, which is correct since users are never hard-deleted.
+
+### Deferred Table — `V5__pulse_log.sql` — Phase 8 only
 
 The following schema is defined here for completeness. **Do not create this table before Phase 8.**
 Creating it without a consumer adds schema overhead with no benefit.
 
 ```sql
--- Create in V4__pulse_log.sql when React frontend is built (Phase 8)
+-- Create in V5__pulse_log.sql when React frontend is built (Phase 8)
 CREATE TABLE pulse_log (
     id         BIGINT        AUTO_INCREMENT PRIMARY KEY,
     num_unidad VARCHAR(100)  NOT NULL,
@@ -676,6 +707,7 @@ control. All sensitive and deployment-specific values are supplied at runtime.
 | SOAP library | JAX-WS Metro `jaxws-rt:4.0.2` | Jakarta EE 10 compatible; direct successor to stubs used in production |
 | Stub generation | `wsimport` from WSDL → `target/generated-sources` | Not source-controlled; `javax.*` → `jakarta.*` handled automatically by plugin |
 | JWT | Access 15 min / Refresh 7 days | Standard for stateless REST API consumed by a React SPA |
+| JWT sub / refresh token identity | `Long userId` | Decouples auth tokens from username. Username is mutable metadata. JWT `sub` and `refresh_tokens.user_id` both use the stable surrogate key. |
 | Pulse result logging | Phase 1 — SLF4J/Logback only | No frontend consumer until Phase 8; `pulse_log` table deferred |
 | Browser Geolocation API | Deferred — future `GpsCoordinateProvider` implementation | Requires open browser tab; not reliable for field operators |
 | DB relations | None between units and users | Units are independent; no assignment model |
@@ -715,7 +747,7 @@ may be skipped.
 | **5** | `ManualCoordinateAdapter` + `PulseOrchestrationService` + global `@Scheduled` tick + `POST /api/units/{numUnidad}/pulse/force`. | Pulses dispatch on the 15-minute cycle for active units within their window. Force-dispatch endpoint works. Skip conditions (`SKIPPED_OUT_OF_WINDOW`, `SKIPPED_NO_COORDINATES`) log correctly. **Production replacement milestone — see below.** |
 | **6** | `TraccarPositionController` + `GpsPositionCache` + `TraccarCoordinateAdapter`. | Controller receives Traccar OsmAnd GET, constructs valid `GpsReading`, stores in cache. `TraccarCoordinateAdapter.getCoordinates()` returns cache contents. `SKIPPED_STALE` fires after 300 s without a refresh. Full flow tested with Mockito before real devices. |
 | **7** | `UnitController` + `ProviderTestController` + `TestProviderUseCase` dry-run endpoint. | All endpoints in the authorization matrix respond correctly. `GET /api/units/{numUnidad}/pulse/test` returns a `GpsReading` with zero `PulseSender` invocations (verified in tests). API contract is stable for React consumption. |
-| **8** | React frontend + `V4__pulse_log.sql` Flyway migration. | Deferred. Begins only after Phase 7 is stable in a deployed environment. |
+| **8** | React frontend + `V5__pulse_log.sql` Flyway migration. | Deferred. Begins only after Phase 7 is stable in a deployed environment. |
 
 ### Production Replacement Milestone — End of Phase 5
 

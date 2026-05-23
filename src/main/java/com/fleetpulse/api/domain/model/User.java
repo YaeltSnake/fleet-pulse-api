@@ -3,11 +3,11 @@ package com.fleetpulse.api.domain.model;
 
 public class User {
 
-    private Long id;
-    private String username;
-    private String passwordHash;
-    private Role role;
-    private boolean active;
+    private final Long id;
+    private final String username;
+    private final String passwordHash;
+    private final Role role;
+    private final boolean active;
 
     public User(Long id, String username, String passwordHash, Role role, boolean active) {
         this.id = id;
@@ -37,23 +37,4 @@ public class User {
         return active;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
-    }
-
-    public void setRole(Role role) {
-        this.role = role;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
-    }
 }

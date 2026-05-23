@@ -7,7 +7,7 @@ import java.util.List;
 public interface ManageUnitUseCase {
     Unit createUnit(Unit unit);
     Unit updateUnit(Unit unit);
-    void deleteUnit(String numUnidad);
+    void deactivateUnit(String numUnidad);
     Unit findUnit(String numUnidad);
     List<Unit> findAllUnits();
 }

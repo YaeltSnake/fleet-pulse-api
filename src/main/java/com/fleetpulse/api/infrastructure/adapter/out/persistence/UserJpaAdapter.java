@@ -15,6 +15,21 @@ public class UserJpaAdapter implements UserRepository {
 
     private final UserJpaRepository jpaRepository;
 
+    @Override
+    public Optional<User> findByUsername(String username) {
+        return jpaRepository.findByUsername(username).map(this::toDomain);
+    }
+
+    @Override
+    public boolean existsByUsername(String username) {
+        return jpaRepository.existsByUsername(username);
+    }
+
+    @Override
+    public Optional<User> findById(Long id) {
+        return jpaRepository.findById(id).map(this::toDomain);
+    }
+
     public UserJpaAdapter(UserJpaRepository jpaRepository) {
         this.jpaRepository = jpaRepository;
     }
@@ -26,28 +41,20 @@ public class UserJpaAdapter implements UserRepository {
     }
 
     @Override
-    public Optional<User> findByUsername(String username) {
-        return jpaRepository.findByUsername(username).map(this::toDomain);
-    }
-
-    @Override
     public List<User> findAll() {
         return jpaRepository.findAll().stream().map(this::toDomain).toList();
     }
 
-    @Override
     @Transactional
-    public void deactivateByUsername(String username) {
-        UserEntity entity = jpaRepository.findByUsername(username)
-                .orElseThrow(() -> new UserNotFoundException(username));
-        entity.setActive(false);
-        jpaRepository.save(entity);
-
-    }
-
     @Override
-    public boolean existsByUsername(String username) {
-        return jpaRepository.existsByUsername(username);
+    public void deactivateById(Long id) {
+
+        UserEntity userEntity = jpaRepository.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+
+        userEntity.setActive(false);
+
+        jpaRepository.save(userEntity);
+
     }
 
     private User toDomain(UserEntity entity){
@@ -62,6 +69,7 @@ public class UserJpaAdapter implements UserRepository {
 
     private UserEntity toEntity(User user){
         return UserEntity.builder()
+                .id(user.getId())
                 .username(user.getUsername())
                 .passwordHash(user.getPasswordHash())
                 .role(user.getRole())

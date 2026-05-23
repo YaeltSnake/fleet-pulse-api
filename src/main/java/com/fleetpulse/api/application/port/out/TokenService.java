@@ -1,17 +1,20 @@
 package com.fleetpulse.api.application.port.out;
 
 import java.time.Duration;
+import java.time.Instant;
 
 public interface TokenService {
 
-    String generateAccessToken(String username, String role);
+    String generateAccessToken(Long userId, String role);
 
-    String generateRefreshToken(String username);
+    String generateRefreshToken(Long userId);
 
-    String extractUsername(String token);
+    Long extractUserId(String token);
 
-    boolean isTokenValid(String token, String username);
+    boolean isTokenValid(String token, Long id);
 
     Duration remainingTtl(String token);
+
+    Instant refreshTokenExpiresAt();
 
 }

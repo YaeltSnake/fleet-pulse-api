@@ -12,13 +12,12 @@ import lombok.*;
 
 @Entity
 @Table(name = "users")
-
 public class UserEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(name = "username")
+    @Column(name = "username", unique = true)
     private String username;
     @Column(name = "password_hash")
     private String passwordHash;
