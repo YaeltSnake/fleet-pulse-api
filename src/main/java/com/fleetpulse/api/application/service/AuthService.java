@@ -35,66 +35,69 @@ public class AuthService implements AuthUseCase {
         if (!passwordHasher.matches(password, user.getPasswordHash())) throw new InvalidCredentialsException("Invalid Credentials");
 
         String accessToken = tokenService.generateAccessToken(user.getId(), user.getRole().name());
-        String refreshToken = tokenService.generateRefreshToken(user.getId());
+        TokenService.GeneratedRefreshToken generated = tokenService.generateRefreshToken(user.getId());
 
-        RefreshToken refreshTokenEntity = new RefreshToken(refreshToken, user.getId(), tokenService.refreshTokenExpiresAt(), false);
-        refreshTokenRepository.save(refreshTokenEntity);
-        return new AuthResult(accessToken, refreshToken);
+        RefreshToken storedRefreshToken = new RefreshToken(
+                generated.token(),
+                user.getId(),
+                generated.expiresAt(),
+                false);
+        refreshTokenRepository.save(storedRefreshToken);
+        return new AuthResult(accessToken, generated.token());
     }
 
     @Override
     public AuthResult refresh(String refreshToken) {
-        RefreshToken refreshTokenEntity = refreshTokenRepository.findByToken(refreshToken)
+        RefreshToken storedToken = refreshTokenRepository.findByToken(refreshToken)
                 .orElseThrow(() -> new RefreshTokenNotFoundException("Refresh Token Not Found"));
 
 
-        if(refreshTokenEntity.getExpiresAt().isBefore(Instant.now())) throw new RefreshTokenExpiredException("Refresh token expired");
-        if(refreshTokenEntity.isRevoked()) throw new RefreshTokenRevokedException("Refresh Token Revoked");
+        if(storedToken.getExpiresAt().isBefore(Instant.now())) throw new RefreshTokenExpiredException("Refresh token expired");
+        if(storedToken.isRevoked()) throw new RefreshTokenRevokedException("Refresh Token Revoked");
 
         refreshTokenRepository.revokeByToken(refreshToken);
 
-        Long userId = refreshTokenEntity.getUserId();
+        Long userId = storedToken.getUserId();
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(refreshTokenEntity.getUserId()));
+                .orElseThrow(() -> new UserNotFoundException(userId));
 
 
-        if(!user.isActive()) throw new UserNotActiveException(user.getId().toString());
+        if(!user.isActive()) throw new UserNotActiveException(user.getUsername());
 
         String accessToken = tokenService.generateAccessToken(userId, user.getRole().name());
-        String newRefreshToken = tokenService.generateRefreshToken(userId);
+        TokenService.GeneratedRefreshToken generated = tokenService.generateRefreshToken(userId);
 
-        RefreshToken newRefreshTokenEntity = new RefreshToken(newRefreshToken, userId, tokenService.refreshTokenExpiresAt(), false);
-        refreshTokenRepository.save(newRefreshTokenEntity);
+        RefreshToken newStoredToken = new RefreshToken(
+                generated.token(),
+                userId,
+                generated.expiresAt(),
+                false);
+        refreshTokenRepository.save(newStoredToken);
 
-        return new AuthResult(accessToken, newRefreshToken);
+        return new AuthResult(accessToken, generated.token());
     }
 
     @Override
     public void logout(String accessToken, String refreshToken) {
+        RefreshToken storedToken = refreshTokenRepository.findByToken(refreshToken)
+                .orElseThrow(() -> new RefreshTokenNotFoundException("Refresh token not found"));
 
-        RefreshToken refreshTokenEntity = refreshTokenRepository.findByToken(refreshToken)
-                .orElseThrow(() -> new RefreshTokenNotFoundException("Refresh Token Not Found"));
-
-        if (refreshTokenEntity.getExpiresAt().isBefore(Instant.now())) throw new RefreshTokenExpiredException("Refresh Token Expired");
-
-        Long accessTokenUserId;
-        try {
-            accessTokenUserId = tokenService.extractUserId(accessToken);
-        } catch (Exception e) {
-            throw new InvalidCredentialsException("Invalid access token");
+        if (storedToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new RefreshTokenExpiredException("Refresh token expired");
         }
 
-        if (!accessTokenUserId.equals(refreshTokenEntity.getUserId())) {
+        Long accessTokenUserId = tokenService.extractUserId(accessToken);
+
+        if (!accessTokenUserId.equals(storedToken.getUserId())) {
             throw new InvalidCredentialsException("Token mismatch");
         }
 
-        Duration duration = tokenService.remainingTtl(accessToken);
-        if (!duration.isNegative() && !duration.isZero()) {
-            tokenBlacklist.blacklist(accessToken, duration);
+        Duration remaining = tokenService.remainingTtl(accessToken);
+        if (!remaining.isNegative() && !remaining.isZero()) {
+            tokenBlacklist.blacklist(accessToken, remaining);
         }
 
         refreshTokenRepository.revokeByToken(refreshToken);
-
     }
 }

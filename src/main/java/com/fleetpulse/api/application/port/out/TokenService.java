@@ -5,16 +5,16 @@ import java.time.Instant;
 
 public interface TokenService {
 
+    record GeneratedRefreshToken(String token, Instant expiresAt){}
+
     String generateAccessToken(Long userId, String role);
 
-    String generateRefreshToken(Long userId);
+    GeneratedRefreshToken generateRefreshToken(Long userId);
 
     Long extractUserId(String token);
 
-    boolean isTokenValid(String token, Long id);
+    boolean isTokenValid(String token, Long userId);
 
     Duration remainingTtl(String token);
-
-    Instant refreshTokenExpiresAt();
 
 }

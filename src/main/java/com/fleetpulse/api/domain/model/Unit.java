@@ -21,9 +21,19 @@ public class Unit {
         this.active = active;
     }
 
+    // Business invariant: fleet operates daytime only. Overnight schedules
+    // (horaInicio > horaFin) are rejected at configuration time by
+    // ConfigureScheduleUseCase. This method assumes valid daytime windows.
     public boolean isWithinActiveWindow(LocalTime now) {
         if (!active) return false;
-        // Note: overnight windows (horaInicio > horaFin) are not supported — always returns false
+        // Business invariant: fleet operates daytime only. Overnight schedules
+        // (horaInicio > horaFin) are rejected at configuration time by
+        // ConfigureScheduleUseCase. This method assumes valid daytime windows.
+        if (horaInicio.isAfter(horaFin)) {
+            throw new IllegalStateException(
+                    "Overnight window detected for unit " + numUnidad +
+                            ". This violates fleet operating policy.");
+        }
         return !now.isBefore(horaInicio) && !now.isAfter(horaFin);
     }
 

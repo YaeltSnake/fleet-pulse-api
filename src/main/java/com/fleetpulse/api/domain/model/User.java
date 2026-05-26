@@ -3,6 +3,8 @@ package com.fleetpulse.api.domain.model;
 
 public class User {
 
+    // FIXME: userId should be a business identifier (UUID or stable natural key),
+   // not the database surrogate key. See ADR-003. Migrate before Phase 6.
     private final Long id;
     private final String username;
     private final String passwordHash;

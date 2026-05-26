@@ -30,4 +30,5 @@ public class UnitEntity {
     private String trackingNumber;
     @Column(name = "active")
     private boolean active;
+
 }

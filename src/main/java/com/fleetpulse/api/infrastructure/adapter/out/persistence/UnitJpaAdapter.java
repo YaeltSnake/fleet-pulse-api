@@ -66,6 +66,7 @@ public class UnitJpaAdapter implements UnitRepository{
 
     private UnitEntity toEntity(Unit unit){
         return UnitEntity.builder()
+                .id(null)
                 .numUnidad(unit.getNumUnidad())
                 .horarioFijo(unit.isHorarioFijo())
                 .horaInicio(unit.getHoraInicio())
