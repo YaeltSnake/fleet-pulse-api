@@ -1,6 +1,5 @@
 package com.fleetpulse.api.infrastructure.adapter.out.persistence;
 
-import com.fleetpulse.api.domain.exception.UnitNotFoundException;
 import com.fleetpulse.api.domain.model.Unit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -95,9 +94,10 @@ public class UnitJpaAdapterTest {
     }
 
     @Test
-    void desactivateByNumunidad_throwsWhenNotFound(){
-        assertThatThrownBy(() -> adapter.deactivateByNumUnidad("Nonexistent"))
-                .isInstanceOf(UnitNotFoundException.class);
+    void deactivateByNumUnidad_nonExistentUnit_doesNotThrow(){
+        // Adapter is passive: @Modifying @Query silently affects 0 rows.
+        // Domain exception (UnitNotFoundException) is the application service's responsibility.
+        assertThatNoException().isThrownBy(() -> adapter.deactivateByNumUnidad("Nonexistent"));
     }
 
 }

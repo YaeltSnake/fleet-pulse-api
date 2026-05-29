@@ -1,22 +1,23 @@
 package com.fleetpulse.api.domain.model;
 
 import java.time.LocalTime;
+import java.util.Objects;
 
 public class Unit {
 
-    private String numUnidad;
-    private boolean horarioFijo;
-    private LocalTime horaInicio;
-    private LocalTime horaFin;
-    private String trackingNumber;
-    private boolean active;
+    private final String numUnidad;
+    private final boolean horarioFijo;
+    private final LocalTime horaInicio;
+    private final LocalTime horaFin;
+    private final String trackingNumber; // nullable by design: null means global env default
+    private final boolean active;
 
     public Unit(String numUnidad, boolean horarioFijo, LocalTime horaInicio,
                 LocalTime horaFin, String trackingNumber, boolean active) {
-        this.numUnidad = numUnidad;
+        this.numUnidad = Objects.requireNonNull(numUnidad, "numUnidad must not be null");
         this.horarioFijo = horarioFijo;
-        this.horaInicio = horaInicio;
-        this.horaFin = horaFin;
+        this.horaInicio = Objects.requireNonNull(horaInicio, "horaInicio must not be null");
+        this.horaFin = Objects.requireNonNull(horaFin, "horaFin must not be null");
         this.trackingNumber = trackingNumber;
         this.active = active;
     }

@@ -1,11 +1,9 @@
 package com.fleetpulse.api.infrastructure.adapter.out.persistence;
 
 import com.fleetpulse.api.application.port.out.UnitRepository;
-import com.fleetpulse.api.domain.exception.UnitNotFoundException;
 import com.fleetpulse.api.domain.model.Unit;
 import com.fleetpulse.api.infrastructure.adapter.out.persistence.entity.UnitEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -37,15 +35,8 @@ public class UnitJpaAdapter implements UnitRepository{
     }
 
     @Override
-    @Transactional
     public void deactivateByNumUnidad(String numUnidad) {
-        UnitEntity entity = jpaRepository.findByNumUnidad(numUnidad)
-                .orElseThrow(() -> new UnitNotFoundException(numUnidad));
-
-        entity.setActive(false);
-
-        jpaRepository.save(entity);
-
+        jpaRepository.deactivateByNumUnidad(numUnidad);
     }
 
     @Override

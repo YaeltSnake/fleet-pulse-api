@@ -86,7 +86,7 @@
 
 ## Phase 3 — Security + Auth
 **Tag:** `v0.3.0`
-**Exit condition:** ADMIN and USER roles enforce the authorization matrix. No endpoint reachable without valid token except `/api/auth/*`. Login returns access token + refresh token. Logout blacklists access token in Redis AND marks refresh token as `revoked = true` in DB. First ADMIN provisioned via `AdminUserInitializer` on startup. All tests pass.
+**Exit condition:** ADMIN and USER roles enforce the authorization matrix. No endpoint reachable without valid token except `/api/auth/*`. Login returns access token + refresh token. Logout blacklists access token in Redis AND marks refresh token as `revoked = true` in DB. First ADMIN provisioned via `AdminUserInitializer` on startup. All tests pass. All 6 Layer 4 components implemented in order. No component marked as BLOCKED for more than one iteration. `ApplicationConfig` declares all `@Bean`s for application services and security components.
 
 ### Layer 1 — Infrastructure dependencies
 
@@ -117,19 +117,28 @@
 | ✅ | `UserManagementService.java` in `application/service/` — ADMIN-only: create user, deactivate user, list users |
 | ✅ | Both services call only ports — zero Spring, JJWT, or JPA imports |
 
-### Layer 4 — Infrastructure / Security
+### Layer 4 — Infrastructure / Security (Implement in this order)
 
-| Status | Task |
-|---|---|
-| ⬜ | `JwtService.java` in `infrastructure/security/` — implements `TokenService` port; HS256 signing via JJWT; key from `JWT_SECRET` env var |
-| ⬜ | `JwtAuthenticationFilter.java` — `OncePerRequestFilter`; extracts Bearer token, checks blacklist, sets `SecurityContextHolder` |
-| ⬜ | `UserDetailsServiceImpl.java` — implements Spring `UserDetailsService`; loads user via `UserRepository` port |
-| ⬜ | `SecurityConfig.java` — full authorization matrix; `hasAuthority()` (no `ROLE_` prefix); stateless session; `/api/auth/**` and `/api/gps/position` are the only public paths |
-| ⬜ | `BCryptPasswordEncoder` bean declared in `SecurityConfig` |
-| ⬜ | `RefreshTokenJpaAdapter.java` + `RefreshTokenEntity.java` — implements `RefreshTokenRepository`; maps between domain `RefreshToken` and `RefreshTokenEntity` |
-| ⬜ | `RedisTokenBlacklistAdapter.java` — implements `TokenBlacklist`; TTL set to `remainingTtl` argument (not fixed value); fail closed on Redis unavailable |
+| Order | Component | Files | Depends On | Status |
+|---|---|---|---|--|
+| 4.1 | Persistencia RefreshToken | `RefreshTokenEntity.java`, `RefreshTokenJpaRepository.java`, `RefreshTokenJpaAdapter.java` | Layer 3 (`AuthService` — consumes `RefreshTokenRepository` port) | ✅ |
+| 4.2 | Redis Blacklist | `RedisTokenBlacklistAdapter.java` | Layer 3 (`TokenBlacklist` port), `StringRedisTemplate` from Spring Data Redis (Layer 1) | ✅ |
+| 4.3 | JWT Service | `JwtService.java` | Layer 3 (`TokenService` port), `JWT_SECRET` env var, `GeneratedRefreshToken` record | ✅ |
+| 4.4 | UserDetailsService | `UserDetailsServiceImpl.java` | Layer 2 (`UserRepository` port) — exists to suppress Spring Boot auto-config only; filter does NOT call it | ✅ |
+| 4.5 | JWT Filter | `JwtAuthenticationFilter.java` | 4.3 (`JwtService`), 4.2 (`RedisTokenBlacklistAdapter`) | ✅ |
+| 4.6 | Security Config + App Config | `SecurityConfig.java`, `ApplicationConfig.java` | 4.4 (`UserDetailsServiceImpl`), 4.5 (`JwtAuthenticationFilter`), `BCryptPasswordEncoder` `@Bean` | ✅ |
+
+#### Dependency Rules
+
+- Each component MUST be completed and its contracts verified before the next begins.
+- A component is "complete" when its port contract is fully implemented and `mvn test` (ArchUnit) passes.
+- If a component cannot be started because a dependency is not yet done, declare it explicitly: `BLOCKED by 4.X — reason`.
+- `@Transactional` belongs in application services (`AuthService`, `UserManagementService`), NOT in any adapter in this layer.
+- `ApplicationConfig` (4.6) is the single source of truth for all `@Bean` declarations: `AuthService`, `UserManagementService`, `BCryptPasswordEncoder`. No `@Service` annotation anywhere in `application/`.
 
 ### Layer 5 — Controllers + DTOs
+
+> ⛔ Cannot begin until Layer 4.6 (`SecurityConfig`) is COMPLETE.
 
 | Status | Task |
 |---|---|
@@ -140,11 +149,15 @@
 
 ### Layer 6 — First ADMIN
 
+> ⛔ Cannot begin until Layer 4.6 (`SecurityConfig`) is COMPLETE.
+
 | Status | Task |
 |---|---|
 | ⬜ | `AdminUserInitializer.java` — `ApplicationRunner`; checks if any ADMIN exists via `UserRepository`; if not, reads `INITIAL_ADMIN_PASSWORD` from env — fail fast with `IllegalStateException` if absent; BCrypt-hashes and inserts via `UserRepository` |
 
 ### Layer 7 — Tests
+
+> ⛔ Cannot begin until Layer 4.6 (`SecurityConfig`) is COMPLETE.
 
 | Status | Task |
 |---|---|

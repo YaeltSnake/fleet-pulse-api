@@ -11,7 +11,8 @@ import java.time.Instant;
 @AllArgsConstructor(access = AccessLevel.PACKAGE)
 @Builder
 
-@Entity(name = "refresh_tokens")
+@Entity
+@Table(name = "refresh_tokens")
 public class RefreshTokenEntity {
 
     @Id

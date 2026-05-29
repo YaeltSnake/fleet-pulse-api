@@ -1,6 +1,5 @@
 package com.fleetpulse.api.infrastructure.adapter.out.persistence;
 
-import com.fleetpulse.api.domain.exception.UserNotFoundException;
 import com.fleetpulse.api.domain.model.Role;
 import com.fleetpulse.api.domain.model.User;
 import org.junit.jupiter.api.Test;
@@ -66,10 +65,10 @@ public class UserJpaAdapterTest {
     }
 
     @Test
-    void deactivateByUsername_setsActiveFalse(){
+    void deactivateById_setsActiveFalse(){
 
-        adapter.save(new User(null, "carlosAlberto@gmial.com", "15F&3ndjs_/hjJUisÑL", Role.USER, true));
-        adapter.deactivateByUsername("carlosAlberto@gmial.com");
+        User saved = adapter.save(new User(null, "carlosAlberto@gmial.com", "15F&3ndjs_/hjJUisÑL", Role.USER, true));
+        adapter.deactivateById(saved.getId());
 
         Optional<User> user = adapter.findByUsername("carlosAlberto@gmial.com");
 
@@ -86,11 +85,10 @@ public class UserJpaAdapterTest {
     }
 
     @Test
-    void deactivateByUsername_throwsWhenNotFound(){
-
-        assertThatThrownBy(() -> adapter.deactivateByUsername("None"))
-                .isInstanceOf(UserNotFoundException.class);
-
+    void deactivateById_nonExistentId_doesNotThrow(){
+        // Adapter is passive: @Modifying @Query silently affects 0 rows.
+        // Domain exception (UserNotFoundException) is the application service's responsibility.
+        assertThatNoException().isThrownBy(() -> adapter.deactivateById(999L));
     }
 
 }

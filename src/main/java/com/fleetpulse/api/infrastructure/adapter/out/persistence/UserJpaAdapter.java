@@ -1,11 +1,9 @@
 package com.fleetpulse.api.infrastructure.adapter.out.persistence;
 
 import com.fleetpulse.api.application.port.out.UserRepository;
-import com.fleetpulse.api.domain.exception.UserNotFoundException;
 import com.fleetpulse.api.domain.model.User;
 import com.fleetpulse.api.infrastructure.adapter.out.persistence.entity.UserEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -45,16 +43,9 @@ public class UserJpaAdapter implements UserRepository {
         return jpaRepository.findAll().stream().map(this::toDomain).toList();
     }
 
-    @Transactional
     @Override
     public void deactivateById(Long id) {
-
-        UserEntity userEntity = jpaRepository.findById(id).orElseThrow(() -> new UserNotFoundException(id));
-
-        userEntity.setActive(false);
-
-        jpaRepository.save(userEntity);
-
+        jpaRepository.deactivateById(id);
     }
 
     private User toDomain(UserEntity entity){

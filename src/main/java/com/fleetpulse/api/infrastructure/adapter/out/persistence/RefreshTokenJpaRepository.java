@@ -12,11 +12,11 @@ public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenEnt
 
     Optional<RefreshTokenEntity> findByToken(String token);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE RefreshTokenEntity r SET r.revoked = true WHERE r.token = :token")
     void revokeByToken(String token);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("DELETE FROM RefreshTokenEntity r WHERE r.expiresAt < :now")
     void deleteAllExpired(Instant now);
 

@@ -3,11 +3,12 @@ package com.fleetpulse.api.infrastructure.adapter.out.persistence;
 import com.fleetpulse.api.application.port.out.RefreshTokenRepository;
 import com.fleetpulse.api.domain.model.RefreshToken;
 import com.fleetpulse.api.infrastructure.adapter.out.persistence.entity.RefreshTokenEntity;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.Optional;
 
+@Component
 public class RefreshTokenJpaAdapter implements RefreshTokenRepository {
 
     private final RefreshTokenJpaRepository jpaRepository;
@@ -32,7 +33,6 @@ public class RefreshTokenJpaAdapter implements RefreshTokenRepository {
         jpaRepository.revokeByToken(token);
     }
 
-    @Transactional
     @Override
     public void deleteAllExpired() {
         jpaRepository.deleteAllExpired(Instant.now());
