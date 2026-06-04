@@ -43,7 +43,7 @@ public class UserJpaAdapterTest {
         adapter.save(new User(null, "juanGarcia@gmail.com", "12sajodlfnniueh", Role.USER, true));
         adapter.save(new User(null, "carlosAlberto@gmial.com", "15F&3ndjs_/hjJUisÑL", Role.USER, true));
 
-        List<User> users = adapter.findAll();
+        List<User> users = adapter.findAll(0,2);
 
         assertThat(users).hasSize(2);
         assertThat(users.getFirst().getUsername()).isEqualTo("juanGarcia@gmail.com");

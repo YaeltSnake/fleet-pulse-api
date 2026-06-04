@@ -3,6 +3,7 @@ package com.fleetpulse.api.infrastructure.config;
 import com.fleetpulse.api.application.port.out.*;
 import com.fleetpulse.api.application.service.AuthService;
 import com.fleetpulse.api.application.service.UserManagementService;
+import com.fleetpulse.api.infrastructure.init.AdminUserInitializer;
 import com.fleetpulse.api.infrastructure.security.BcryptPasswordHasherAdapter;
 import com.fleetpulse.api.infrastructure.security.JwtAuthenticationFilter;
 import com.fleetpulse.api.infrastructure.security.JwtService;
@@ -57,5 +58,14 @@ public class ApplicationConfig {
         return new UserManagementService(userRepository, passwordHasher);
     }
 
+    @Bean
+    public AdminUserInitializer adminUserInitializer(
+            UserRepository userRepository,
+            PasswordHasher hasher,
+            @Value("${app.initial-admin-username}") String adminUsername,
+            @Value("${app.initial-admin-password}") String adminPassword
+    ){
+        return new AdminUserInitializer(userRepository, hasher, adminUsername, adminPassword);
+    }
 
 }

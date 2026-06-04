@@ -136,18 +136,239 @@
 - `@Transactional` belongs in application services (`AuthService`, `UserManagementService`), NOT in any adapter in this layer.
 - `ApplicationConfig` (4.6) is the single source of truth for all `@Bean` declarations: `AuthService`, `UserManagementService`, `BCryptPasswordEncoder`. No `@Service` annotation anywhere in `application/`.
 
-### Layer 5 — Controllers + DTOs
+### Layer 5 — Controllers + DTOs + Global Error Handling
 
-> ⛔ Cannot begin until Layer 4.6 (`SecurityConfig`) is COMPLETE.
+> ⛔ Cannot begin until Layer 4.6 (`SecurityConfig`) is COMPLETE. Layer 4.6 is ✅ COMPLETE as of commit `58ce7a0`.
 
-| Status | Task |
-|---|---|
-| ⬜ | `AuthController.java` — `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout` |
-| ⬜ | `UserController.java` — ADMIN-only: `GET /api/users`, `POST /api/users`, `PUT /api/users/{id}`, `DELETE /api/users/{id}` |
-| ⬜ | DTOs: `LoginRequest`, `LoginResponse`, `RefreshRequest`, `RefreshResponse`, `CreateUserRequest`, `UserResponse` |
-| ⬜ | Global `@ControllerAdvice` — RFC 7807 `application/problem+json` error responses for all 4xx/5xx; no Spring whitelabel error page |
+**Exit condition:** All endpoints respond with correct HTTP status, RFC 7807 error bodies, OpenAPI docs accessible at `/v3/api-docs`, and authorization matrix enforced. All components implemented in order. No component marked as BLOCKED. `AdminUserInitializer` seeds first ADMIN on fresh database. `mvn test` passes (unit + integration + ArchUnit).
+
+#### Dependency Rules
+
+- Each component MUST be completed and its contracts verified before the next begins.
+- A component is "complete" when `mvn test` passes (unit + integration) and ArchUnit passes.
+- If a component cannot be started because a dependency is not yet done, declare it explicitly: `BLOCKED by 5.X — reason`.
+- `@ControllerAdvice` handles ALL errors. No Spring whitelabel page.
+- DTOs are `record`. Controllers return `ResponseEntity`. Application services are never called directly from tests — inject and mock the use case port.
+- Controllers inject **driving port interfaces** (`AuthUseCase`, `UserManagementUseCase`), never service implementations directly.
+
+#### Component Map
+
+| Order | Component | Files | Depends On | Status |
+|---|---|---|---|---|
+| 5.1 | DTOs + Commands | See 5.1 section | Layer 3 (ports defined) — COMPLETE | ⬜ |
+| 5.2 | Thin Mappers (optional) | `DtoToCommandMapper.java`, `ResponseFromDomainMapper.java` | 5.1 (DTOs exist) | ⬜ |
+| 5.3 | Global Exception Handler | `GlobalExceptionHandler.java` | Domain exceptions (Layer 1 — COMPLETE) | ⬜ |
+| 5.4 | AuthController | `AuthController.java` | 5.1, 5.3, `AuthUseCase` port (Layer 3 — COMPLETE) | ⬜ |
+| 5.5 | UserController | `UserController.java` | 5.1, 5.3, `UserManagementUseCase` port (Layer 3 — COMPLETE) | ⬜ |
+| 5.6 | OpenAPI + SpringDoc | `pom.xml` + `@Tag`/`@Operation` on controllers | 5.4, 5.5 (controllers exist) | ⬜ |
+| 5.7 | AdminUserInitializer | `AdminUserInitializer.java` | `UserRepository`, `PasswordHasher` (Layer 3 — COMPLETE). Parallel with 5.1. | ⬜ |
+
+#### 5.1 — DTOs + Commands
+
+Files:
+- `infrastructure/adapter/in/web/dto/LoginRequest.java`
+- `infrastructure/adapter/in/web/dto/LoginResponse.java`
+- `infrastructure/adapter/in/web/dto/RefreshRequest.java`
+- `infrastructure/adapter/in/web/dto/RefreshResponse.java`
+- `infrastructure/adapter/in/web/dto/CreateUserRequest.java`
+- `infrastructure/adapter/in/web/dto/UpdateUserRequest.java`
+- `infrastructure/adapter/in/web/dto/UserResponse.java`
+
+> `UnitResponse` and `ScheduleUpdateRequest` belong to `UnitController` (Phase 7). Do not create them here.
+
+Commands (application layer — pure Java records):
+- `application/service/command/CreateUserCommand.java`
+- `application/service/command/UpdateUserCommand.java`
+- `application/service/command/LoginCommand.java`
+
+Rules:
+- ALL DTOs are `public record`.
+- Request DTOs: Jakarta Validation annotations (`@NotBlank`, `@Size`, `@Pattern`, `@Email`).
+- Response DTOs: only safe fields — no `passwordHash`, no internal IDs unless required by API contract.
+- `LoginResponse` returns `accessToken`, `refreshToken`, `expiresAt` — intended auth response contract.
+- `DTO.toCommand()` converts request DTO to domain command. NEVER pass DTO directly to application service.
+- Business validation (exists in DB, role check) goes in application service, not in DTO.
+
+Exit condition: All records compile. All `toCommand()` methods tested with valid and invalid input.
+
+#### 5.2 — Thin Mappers (Optional)
+
+Files (skip entirely if `toCommand()` in the record is sufficient):
+- `infrastructure/adapter/in/web/mapper/DtoToCommandMapper.java`
+- `infrastructure/adapter/in/web/mapper/ResponseFromDomainMapper.java`
+
+Rules:
+- NO MapStruct for DTO→Command. Manual mapping only.
+- MapStruct ALLOWED only for Entity↔Domain in persistence adapters (Layer 2 — already done).
+- If mapping is trivial (≤ 3 fields): put it in the record as `static` method, skip this class.
+- If mapping has conditional logic or nested objects: create thin mapper class.
+- Mapper has zero business logic. Only field assignment.
+
+Exit condition: All mappings compile. Tested with edge cases (null fields, empty strings).
+
+#### 5.3 — Global Exception Handler
+
+File: `infrastructure/adapter/in/web/GlobalExceptionHandler.java`
+
+Rules:
+- `@ControllerAdvice`
+- Returns `application/problem+json` for every error (`type`, `title`, `status`, `detail`, `instance`, `timestamp`)
+- Never exposes stack traces to client
+- Logs full stack trace with correlation ID (UUID) at `ERROR` level for 5xx errors
+- Client receives correlation ID for support; stack trace stays in logs only
+
+Exception mapping:
+
+| Exception | HTTP Status | Type URI |
+|---|---|---|
+| `MethodArgumentNotValidException` | 400 | `/errors/validation-failed` |
+| `InvalidCoordinateException` | 400 | `/errors/invalid-coordinates` |
+| `UserNotFoundException` | 404 | `/errors/user-not-found` |
+| `UnitNotFoundException` | 404 | `/errors/unit-not-found` |
+| `InvalidCredentialsException` | 401 | `/errors/invalid-credentials` |
+| `UserNotActiveException` | 401 | `/errors/invalid-credentials` (same URI — do not reveal reason to client) |
+| `RefreshTokenNotFoundException` | 401 | `/errors/token-invalid` |
+| `RefreshTokenExpiredException` | 401 | `/errors/token-expired` |
+| `RefreshTokenRevokedException` | 401 | `/errors/token-revoked` |
+| `AccessDeniedException` | 403 | `/errors/forbidden` |
+| `UsernameAlreadyExistsException` | 409 | `/errors/username-exists` |
+| `ExternalServiceUnavailableException` | 503 | `/errors/service-unavailable` |
+| `GpsProviderUnavailableException` | 503 | `/errors/service-unavailable` (register now — active Phase 6) |
+| `PulseSendException` | 502 | `/errors/soap-rejected` |
+| `Exception` (fallback) | 500 | `/errors/internal-error` (log + correlation ID, never expose stack trace) |
+
+> `OutOfActiveWindowException` does NOT exist in `domain/exception/` yet. Do not add it here. Add when the class is created in Phase 7 (`ConfigureScheduleUseCase` scope).
+
+Exit condition: All exception types mapped. MockMvc tests verify every error response format and status code. No Spring whitelabel error page accessible.
+
+#### 5.4 — AuthController
+
+File: `infrastructure/adapter/in/web/AuthController.java`
+
+```
+POST /api/auth/login — permitAll
+  Inject:   AuthUseCase (driving port — never AuthService directly)
+  Request:  LoginRequest (username, password)
+  Response: LoginResponse (accessToken, refreshToken, expiresAt)
+  200 OK on success — tokens are not REST resources, no Location header
+  401 Unauthorized on invalid credentials
+
+POST /api/auth/refresh — permitAll
+  Request:  RefreshRequest (refreshToken)
+  Response: RefreshResponse (accessToken, refreshToken, expiresAt)
+  200 OK on success
+  401 Unauthorized on invalid/expired/revoked refresh token
+
+POST /api/auth/logout — authenticated (ADMIN or USER)
+  Request body: LogoutRequest (refreshToken)
+  Access token from Authorization header — extracted by JwtAuthenticationFilter, not by controller
+  Response: 204 No Content
+  Blacklists access token in Redis + revokes refresh token in DB
+```
+
+Rules:
+- Inject `AuthUseCase` (driving port), never `AuthService` directly.
+- `JwtAuthenticationFilter` handles token extraction. Controller receives `Authentication` from `SecurityContextHolder`.
+
+Exit condition: MockMvc tests — valid login (200), invalid credentials (401), expired access token (401), logout then immediate reuse of blacklisted token returns 401. All paths return RFC 7807 on error. OpenAPI annotations present.
+
+#### 5.5 — UserController
+
+File: `infrastructure/adapter/in/web/UserController.java`
+
+```
+GET /api/users — ADMIN only
+  Inject:   UserManagementUseCase (driving port — never UserManagementService directly)
+  Response: Page<UserResponse> (paginated, default size=20, max=100)
+  200 OK
+
+POST /api/users — ADMIN only
+  Request:  CreateUserRequest
+  Response: UserResponse
+  201 Created — Location header: /api/users/{id}
+
+PUT /api/users/{id} — ADMIN only
+  Request:  UpdateUserRequest
+  Response: UserResponse
+  200 OK
+
+DELETE /api/users/{id} — ADMIN only
+  Response: 204 No Content
+  Soft delete (active = false). Never hard delete.
+```
+
+Rules:
+- `@PreAuthorize("hasAuthority('ADMIN')")` on class or individual methods.
+- `Pageable` parameter for list endpoint. Max page size enforced (≤ 100) — return 400 if `size > 100`.
+- Path variable `{id}` is `Long` userId (ADR-003 — accepted until Phase 6).
+
+Exit condition: MockMvc tests — ADMIN creates user (201), USER token rejected (403), duplicate username (409 RFC 7807), pagination tested with `page`, `size`, `sort`. OpenAPI annotations present.
+
+#### 5.6 — OpenAPI + SpringDoc
+
+Add to `pom.xml`:
+```xml
+<dependency>
+    <groupId>org.springdoc</groupId>
+    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    <version>2.5.0</version>
+</dependency>
+```
+
+Rules:
+- `@Tag(name, description)` on each controller class.
+- `@Operation(summary, description)` on each endpoint method.
+- `@ApiResponse` for every status code the method can return, including error responses with `ProblemDetail` schema.
+- Annotations are infrastructure-only. Never on domain or application classes.
+
+Access: `/swagger-ui.html` (interactive) · `/v3/api-docs` (OpenAPI JSON spec)
+
+Exit condition: All endpoints documented. Error responses visible in Swagger UI.
+
+#### 5.7 — AdminUserInitializer
+
+File: `infrastructure/init/AdminUserInitializer.java`
+
+> See also: **Layer 6** — same component tracked there for release marking. Mark both when complete.
+
+Depends on: `UserRepository` port + `PasswordHasher` port — **COMPLETE since Layer 3/4**. Does NOT depend on 5.4 or 5.5. Implement in parallel with 5.1.
+
+Rules:
+- `ApplicationRunner` — runs on startup.
+- Checks if any ADMIN exists via `UserRepository`.
+- If no ADMIN: reads `INITIAL_ADMIN_PASSWORD` from environment.
+  - If absent: `throw new IllegalStateException("INITIAL_ADMIN_PASSWORD env var is required when no ADMIN user exists")`.
+  - If present: BCrypt-hash via `PasswordHasher`, insert via `UserRepository`.
+- On second run: no-op. No duplicate. No error.
+- Log output: `"ADMIN_SEEDED"` or `"ADMIN_ALREADY_EXISTS"` at `INFO` level.
+
+Exit condition: Test — ADMIN created when none exists. Test — no duplicate on second run. Test — `IllegalStateException` when `INITIAL_ADMIN_PASSWORD` not set.
+
+#### Test Matrix
+
+| Component | Test Type | Tools | Scope |
+|---|---|---|---|
+| 5.1 DTOs | Unit | JUnit 5, AssertJ | Validation annotations, `toCommand()`, edge cases |
+| 5.2 Mappers | Unit | JUnit 5, AssertJ | Field mapping, null handling |
+| 5.3 Handler | Integration | `@WebMvcTest` (preferred) or `@SpringBootTest` + MockMvc | Every exception → correct `ProblemDetail` format and status code |
+| 5.4 AuthController | Integration | `@SpringBootTest` + MockMvc + Testcontainers (MySQL + Redis) | Login (200), refresh, logout, blacklisted token reuse (401) |
+| 5.5 UserController | Integration | `@SpringBootTest` + MockMvc + Testcontainers (MySQL) | CRUD, pagination, auth rejection (403) |
+| 5.6 OpenAPI | Validation | swagger-cli | Spec compliance, schema correctness |
+| 5.7 AdminUserInitializer | Integration | `@SpringBootTest` + Testcontainers (MySQL) | Startup seeding, idempotency, fail-fast on missing env var |
+
+#### Blocked States
+
+```
+If 5.1 is not done → 5.2 BLOCKED (no DTOs to map)
+If 5.3 is not done → 5.4 BLOCKED (no error handling for auth controller)
+If 5.3 is not done → 5.5 BLOCKED (no error handling for user controller)
+If 5.4 is not done → 5.6 BLOCKED (no controllers to document)
+5.7 AdminUserInitializer → NOT BLOCKED by any 5.x — depends on Layer 3 only (COMPLETE)
+```
 
 ### Layer 6 — First ADMIN
+
+> **NOTE:** `AdminUserInitializer` is implemented and tested as component **5.7 in Layer 5**. Mark this layer complete when Layer 5 exit condition is fully met. No separate implementation needed here.
 
 > ⛔ Cannot begin until Layer 4.6 (`SecurityConfig`) is COMPLETE.
 
@@ -156,6 +377,12 @@
 | ⬜ | `AdminUserInitializer.java` — `ApplicationRunner`; checks if any ADMIN exists via `UserRepository`; if not, reads `INITIAL_ADMIN_PASSWORD` from env — fail fast with `IllegalStateException` if absent; BCrypt-hashes and inserts via `UserRepository` |
 
 ### Layer 7 — Tests
+
+> **NOTE:** Several tests in this layer overlap with Layer 5's test matrix or are already complete:
+> `JwtServiceTest` ✅ and `RedisTokenBlacklistAdapterTest` ✅ — completed in commit `58ce7a0`.
+> `AuthControllerTest`, `UserManagementServiceTest`, and `AdminUserInitializerTest` — covered by Layer 5 (components 5.4, 5.5, 5.7).
+> Only `RefreshTokenJpaAdapterTest` remains as a standalone pending item in this layer.
+> Update this layer after Layer 5 is complete and all duplicates are confirmed green.
 
 > ⛔ Cannot begin until Layer 4.6 (`SecurityConfig`) is COMPLETE.
 

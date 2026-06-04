@@ -1,4 +1,4 @@
-package com.fleetpulse.api.application.port.in;
+package com.fleetpulse.api.application.service.command;
 
 import com.fleetpulse.api.domain.model.Role;
 

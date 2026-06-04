@@ -1,7 +1,7 @@
 package com.fleetpulse.api.application.service;
 
-import com.fleetpulse.api.application.port.in.CreateUserCommand;
-import com.fleetpulse.api.application.port.in.UpdateUserCommand;
+import com.fleetpulse.api.application.service.command.CreateUserCommand;
+import com.fleetpulse.api.application.service.command.UpdateUserCommand;
 import com.fleetpulse.api.application.port.in.UserManagementUseCase;
 import com.fleetpulse.api.application.port.out.PasswordHasher;
 import com.fleetpulse.api.application.port.out.UserRepository;
@@ -50,6 +50,9 @@ public class UserManagementService implements UserManagementUseCase {
 
     @Override
     public void deactivateUser(Long id) {
+        if (userRepository.findById(id).isEmpty()){
+            throw new UserNotFoundException(id);
+        }
 
         userRepository.deactivateById(id);
     }
@@ -60,7 +63,17 @@ public class UserManagementService implements UserManagementUseCase {
     }
 
     @Override
-    public List<User> findAllUsers() {
-        return userRepository.findAll();
+    public List<User> findAllUsers(int page, int size) {
+        return userRepository.findAll(page, size);
+    }
+
+    @Override
+    public long countActiveUsers() {
+        return userRepository.countActiveUsers();
+    }
+
+    @Override
+    public long countAllUsers() {
+        return userRepository.countAllUsers();
     }
 }

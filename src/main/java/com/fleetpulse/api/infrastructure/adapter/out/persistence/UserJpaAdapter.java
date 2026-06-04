@@ -1,8 +1,10 @@
 package com.fleetpulse.api.infrastructure.adapter.out.persistence;
 
 import com.fleetpulse.api.application.port.out.UserRepository;
+import com.fleetpulse.api.domain.model.Role;
 import com.fleetpulse.api.domain.model.User;
 import com.fleetpulse.api.infrastructure.adapter.out.persistence.entity.UserEntity;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -24,6 +26,11 @@ public class UserJpaAdapter implements UserRepository {
     }
 
     @Override
+    public boolean existsByRole(Role role) {
+        return jpaRepository.existsByRole(role);
+    }
+
+    @Override
     public Optional<User> findById(Long id) {
         return jpaRepository.findById(id).map(this::toDomain);
     }
@@ -39,8 +46,18 @@ public class UserJpaAdapter implements UserRepository {
     }
 
     @Override
-    public List<User> findAll() {
-        return jpaRepository.findAll().stream().map(this::toDomain).toList();
+    public List<User> findAll(int page, int size) {
+        return jpaRepository.findAll(PageRequest.of(page, size)).stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public long countActiveUsers() {
+        return jpaRepository.countByActiveTrue();
+    }
+
+    @Override
+    public long countAllUsers() {
+        return jpaRepository.count();
     }
 
     @Override

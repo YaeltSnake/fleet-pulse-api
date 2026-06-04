@@ -1,9 +1,13 @@
 package com.fleetpulse.api.application.port.in;
 
+import com.fleetpulse.api.application.service.command.LoginCommand;
+
+import java.time.Instant;
+
 public interface AuthUseCase {
 
-    AuthResult login(String username, String password);
+    AuthResult login(LoginCommand command);
     AuthResult refresh(String refreshToken);
     void logout(String accessToken, String refreshToken);
-    record AuthResult(String accessToken, String refreshToken){}
+    record AuthResult(String accessToken, String refreshToken, Instant expiresAt){}
 }

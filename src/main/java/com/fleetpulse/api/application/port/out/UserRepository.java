@@ -1,5 +1,6 @@
 package com.fleetpulse.api.application.port.out;
 
+import com.fleetpulse.api.domain.model.Role;
 import com.fleetpulse.api.domain.model.User;
 
 import java.util.List;
@@ -12,8 +13,12 @@ public interface UserRepository {
     // (username or UUID) before Phase 6. See ADR-003
     Optional<User> findById(Long id);
     Optional<User> findByUsername(String username);
-    List<User> findAll();
+    List<User> findAll(int page, int size);
     void deactivateById(Long id);
     boolean existsByUsername(String username);
+    boolean existsByRole(Role role);
+    long countActiveUsers();
+    long countAllUsers();
+
 
 }

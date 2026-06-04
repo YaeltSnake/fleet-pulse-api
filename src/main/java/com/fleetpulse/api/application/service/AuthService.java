@@ -2,6 +2,7 @@ package com.fleetpulse.api.application.service;
 
 import com.fleetpulse.api.application.port.in.AuthUseCase;
 import com.fleetpulse.api.application.port.out.*;
+import com.fleetpulse.api.application.service.command.LoginCommand;
 import com.fleetpulse.api.domain.exception.*;
 import com.fleetpulse.api.domain.model.RefreshToken;
 import com.fleetpulse.api.domain.model.User;
@@ -18,6 +19,7 @@ public class AuthService implements AuthUseCase {
     private final RefreshTokenRepository refreshTokenRepository;
 
     public AuthService(PasswordHasher passwordHasher, TokenBlacklist tokenBlacklist,
+
                        TokenService tokenService, UserRepository userRepository,
                        RefreshTokenRepository refreshTokenRepository) {
         this.passwordHasher = passwordHasher;
@@ -28,11 +30,11 @@ public class AuthService implements AuthUseCase {
     }
 
     @Override
-    public AuthResult login(String username, String password) {
-        User user = userRepository.findByUsername(username).orElseThrow(() -> new UserNotFoundException(username));
+    public AuthResult login(LoginCommand command) {
+        User user = userRepository.findByUsername(command.username()).orElseThrow(() -> new UserNotFoundException(command.username()));
 
-        if(!user.isActive()) throw new UserNotActiveException(username);
-        if (!passwordHasher.matches(password, user.getPasswordHash())) throw new InvalidCredentialsException("Invalid Credentials");
+        if(!user.isActive()) throw new UserNotActiveException(user.getUsername());
+        if (!passwordHasher.matches(command.password(), user.getPasswordHash())) throw new InvalidCredentialsException("Invalid Credentials");
 
         String accessToken = tokenService.generateAccessToken(user.getId(), user.getRole().name());
         TokenService.GeneratedRefreshToken generated = tokenService.generateRefreshToken(user.getId());
@@ -43,7 +45,7 @@ public class AuthService implements AuthUseCase {
                 generated.expiresAt(),
                 false);
         refreshTokenRepository.save(storedRefreshToken);
-        return new AuthResult(accessToken, generated.token());
+        return new AuthResult(accessToken, generated.token(), generated.expiresAt());
     }
 
     @Override
@@ -75,7 +77,7 @@ public class AuthService implements AuthUseCase {
                 false);
         refreshTokenRepository.save(newStoredToken);
 
-        return new AuthResult(accessToken, generated.token());
+        return new AuthResult(accessToken, generated.token(), generated.expiresAt());
     }
 
     @Override
