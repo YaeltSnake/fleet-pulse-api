@@ -7,7 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingRequestValueException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.security.access.AccessDeniedException;
@@ -37,6 +40,7 @@ public class GlobalExceptionHandler {
     private static final String FORBIDDEN = ERROR_BASE + "/forbidden";
     private static final String SERVICE_UNAVAILABLE = ERROR_BASE + "/service-unavailable";
     private static final String SOAP_REJECTED = ERROR_BASE + "/soap-rejected";
+    private static final String MISSING_HEADER = ERROR_BASE + "/missing-header";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ProblemDetail> handleValidationFailure(
@@ -64,6 +68,25 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
 
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ProblemDetail> handleUnreadableBody(
+            HttpMessageNotReadableException ex,
+            HttpServletRequest request
+    ){
+        log.warn("UNREADABLE_BODY: {} - path: {}, client: {}",
+                ex.getClass().getSimpleName(),
+                request.getRequestURI(),
+                request.getRemoteAddr());
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setType(URI.create(VALIDATION_FAILED));
+        problem.setTitle("Malformed or missing request body");
+        problem.setDetail("The request body is missing or cannot be parsed as valid JSON");
+        addStandardProperties(problem, request);
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
     }
 
     @ExceptionHandler({
@@ -283,6 +306,27 @@ public class GlobalExceptionHandler {
         addStandardProperties(problem, request);
 
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(problem);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ProblemDetail> handleMissingHeader(
+            MissingRequestHeaderException ex,
+            HttpServletRequest request
+    ){
+        log.warn("MISSING_REQUEST_HEADER: {} - path: {}, client: {}",
+                ex.getHeaderName(),
+                request.getRequestURI(),
+                request.getRemoteAddr());
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.UNAUTHORIZED);
+
+        problem.setType(URI.create(MISSING_HEADER));
+        problem.setTitle("Missing Header");
+        problem.setDetail("The http request doesn't have the header");
+        addStandardProperties(problem, request);
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(problem);
+
     }
 
     @ExceptionHandler(Exception.class)

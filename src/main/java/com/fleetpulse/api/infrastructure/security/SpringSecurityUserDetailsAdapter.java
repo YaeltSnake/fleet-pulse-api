@@ -8,24 +8,29 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.util.List;
 
-
-public class UserDetailsServiceImpl implements UserDetailsService {
+/**
+ * Satisfies Spring Security's auto-configuration requirement for a UserDetailsService bean.
+ * NOTE: This class is NOT called by JwtAuthenticationFilter — the filter reads claims
+ * directly from the JWT. This adapter exists solely to suppress Spring Boot's
+ * UserDetailsService auto-configuration. See ADR-006.
+ */
+public class SpringSecurityUserDetailsAdapter implements UserDetailsService {
 
     private final UserRepository userRepository;
 
-    public UserDetailsServiceImpl(UserRepository userRepository) {
+    public SpringSecurityUserDetailsAdapter(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-
         return userRepository.findById(Long.decode(username))
-                .map(user -> new org.springframework.security.core.userdetails.
-                        User(user.getUsername(),
+                .map(user -> new org.springframework.security.core.userdetails.User(
+                        user.getUsername(),
                         user.getPasswordHash(),
                         List.of(new SimpleGrantedAuthority(user.getRole().name()))))
-                        .orElseThrow(() -> new UsernameNotFoundException(username));
-
+                .orElseThrow(() -> new UsernameNotFoundException(username));
     }
+
+
 }

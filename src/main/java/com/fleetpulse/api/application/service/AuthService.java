@@ -9,8 +9,16 @@ import com.fleetpulse.api.domain.model.User;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 
 public class AuthService implements AuthUseCase {
+
+
+    // FIXME-TIMING: Constant-time defense against user enumeration (ASVS V2.7.1).
+    // BCrypt cost factor MUST match production value ($2a$10$...).
+    // Validate actual cost factor in application-prod.properties before Phase 5 go-live.
+    private static final String DUMMY_HASH =
+            "$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqhmM6JGKpS4G3R1G2JH8YpfB0Bqy";
 
     private final PasswordHasher passwordHasher;
     private final TokenBlacklist tokenBlacklist;
@@ -19,7 +27,6 @@ public class AuthService implements AuthUseCase {
     private final RefreshTokenRepository refreshTokenRepository;
 
     public AuthService(PasswordHasher passwordHasher, TokenBlacklist tokenBlacklist,
-
                        TokenService tokenService, UserRepository userRepository,
                        RefreshTokenRepository refreshTokenRepository) {
         this.passwordHasher = passwordHasher;
@@ -31,10 +38,22 @@ public class AuthService implements AuthUseCase {
 
     @Override
     public AuthResult login(LoginCommand command) {
-        User user = userRepository.findByUsername(command.username()).orElseThrow(() -> new UserNotFoundException(command.username()));
+        Optional<User> userOpt = userRepository.findByUsername(command.username());
 
-        if(!user.isActive()) throw new UserNotActiveException(user.getUsername());
-        if (!passwordHasher.matches(command.password(), user.getPasswordHash())) throw new InvalidCredentialsException("Invalid Credentials");
+        if (userOpt.isEmpty()) {
+            passwordHasher.matches(command.password(), DUMMY_HASH);
+            throw new InvalidCredentialsException("Invalid Credentials");
+        }
+
+        User user = userOpt.get();
+
+        if (!user.isActive()) {
+            throw new UserNotActiveException(user.getUsername());
+        }
+
+        if (!passwordHasher.matches(command.password(), user.getPasswordHash())) {
+            throw new InvalidCredentialsException("Invalid Credentials");
+        }
 
         String accessToken = tokenService.generateAccessToken(user.getId(), user.getRole().name());
         TokenService.GeneratedRefreshToken generated = tokenService.generateRefreshToken(user.getId());
@@ -45,6 +64,7 @@ public class AuthService implements AuthUseCase {
                 generated.expiresAt(),
                 false);
         refreshTokenRepository.save(storedRefreshToken);
+
         return new AuthResult(accessToken, generated.token(), generated.expiresAt());
     }
 
@@ -53,10 +73,18 @@ public class AuthService implements AuthUseCase {
         RefreshToken storedToken = refreshTokenRepository.findByToken(refreshToken)
                 .orElseThrow(() -> new RefreshTokenNotFoundException("Refresh Token Not Found"));
 
+        if (storedToken.getExpiresAt().isBefore(Instant.now())) {
+            throw new RefreshTokenExpiredException("Refresh token expired");
+        }
 
-        if(storedToken.getExpiresAt().isBefore(Instant.now())) throw new RefreshTokenExpiredException("Refresh token expired");
-        if(storedToken.isRevoked()) throw new RefreshTokenRevokedException("Refresh Token Revoked");
+        if (storedToken.isRevoked()) {
+            throw new RefreshTokenRevokedException("Refresh Token Revoked");
+        }
 
+        // FIXME-SEC-FAMILY: Refresh Token Families not implemented (OAuth 2.0 BCP Section 4.14).
+        // Token theft is undetectable — a stolen+used token only triggers RevokedException
+        // on the legitimate user's next refresh, with no alert or forced re-login for all sessions.
+        // Implement token family tracking in Phase 8+.
         refreshTokenRepository.revokeByToken(refreshToken);
 
         Long userId = storedToken.getUserId();
@@ -64,8 +92,9 @@ public class AuthService implements AuthUseCase {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-
-        if(!user.isActive()) throw new UserNotActiveException(user.getUsername());
+        if (!user.isActive()) {
+            throw new UserNotActiveException(user.getUsername());
+        }
 
         String accessToken = tokenService.generateAccessToken(userId, user.getRole().name());
         TokenService.GeneratedRefreshToken generated = tokenService.generateRefreshToken(userId);
@@ -86,6 +115,9 @@ public class AuthService implements AuthUseCase {
                 .orElseThrow(() -> new RefreshTokenNotFoundException("Refresh token not found"));
 
         if (storedToken.getExpiresAt().isBefore(Instant.now())) {
+            // FIXME-LOGOUT-REFRESH: If refresh token is expired, access token is NOT blacklisted.
+            // User cannot perform clean logout — access token remains valid until natural expiry.
+            // Evaluate partial logout (blacklist access token regardless) before Phase 5.
             throw new RefreshTokenExpiredException("Refresh token expired");
         }
 

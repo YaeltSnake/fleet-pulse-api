@@ -7,7 +7,7 @@ import com.fleetpulse.api.infrastructure.init.AdminUserInitializer;
 import com.fleetpulse.api.infrastructure.security.BcryptPasswordHasherAdapter;
 import com.fleetpulse.api.infrastructure.security.JwtAuthenticationFilter;
 import com.fleetpulse.api.infrastructure.security.JwtService;
-import com.fleetpulse.api.infrastructure.security.UserDetailsServiceImpl;
+import com.fleetpulse.api.infrastructure.security.SpringSecurityUserDetailsAdapter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,8 +37,8 @@ public class ApplicationConfig {
     }
 
     @Bean
-    public UserDetailsServiceImpl userDetailsService(UserRepository userRepository){
-        return new UserDetailsServiceImpl(userRepository);
+    public SpringSecurityUserDetailsAdapter userDetailsService(UserRepository userRepository){
+        return new SpringSecurityUserDetailsAdapter(userRepository);
     }
 
     @Bean

@@ -24,14 +24,14 @@ public class AdminUserInitializer implements ApplicationRunner {
                                 String adminPassword) {
         this.userRepository = Objects.requireNonNull(userRepository, "userRepository must not be null");
         this.passwordHasher = Objects.requireNonNull(passwordHasher, "passwordHasher must not be null");
-        this.adminUsername = adminUsername;
-        this.adminPassword = adminPassword;
+        this.adminUsername = Objects.requireNonNull(adminUsername, "adminUsername must not be null");
+        this.adminPassword = Objects.requireNonNull(adminPassword, "adminPassword must not be null");
     }
+
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
-
-        if (adminAlreadyExists()){
+        if(adminAlreadyExists()){
             log.info("ADMIN_ALREADY_EXISTS");
             return;
         }
@@ -45,12 +45,12 @@ public class AdminUserInitializer implements ApplicationRunner {
 
 
     private void createInitialAdmin(){
-
-        String username = this.adminUsername;
-        String password = this.adminPassword;
-        String hash = passwordHasher.encode(password);
-
-        userRepository.save(new User(null, username, hash, Role.ADMIN, true));
+        if (adminPassword.isBlank()){
+            throw new IllegalStateException("INITIAL_ADMIN_PASSWORD env var is required when no ADMIN user exists");
+        }
+        String hash = passwordHasher.encode(adminPassword);
+        userRepository.save(new User(null, this.adminUsername, hash, Role.ADMIN, true));
     }
+
 
 }

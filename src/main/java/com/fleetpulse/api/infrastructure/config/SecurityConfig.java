@@ -1,5 +1,6 @@
 package com.fleetpulse.api.infrastructure.config;
 import com.fleetpulse.api.infrastructure.security.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -80,6 +81,11 @@ public class SecurityConfig {
 
                         // Secure default
                         .anyRequest().denyAll()
+                )
+                .exceptionHandling(
+                        ex -> ex
+                                .authenticationEntryPoint((request, response, authException) ->
+                                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
                 )
                 .addFilterBefore(
                         jwtAuthenticationFilter,

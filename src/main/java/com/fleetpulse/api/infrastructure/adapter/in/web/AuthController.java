@@ -13,10 +13,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Authentication", description = "Login, token refresh, and logout operations")
 @RestController
@@ -54,6 +52,7 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
 
+
     @PostMapping("/refresh")
     public ResponseEntity<RefreshResponse> refresh(@RequestBody @Valid RefreshRequest request){
 
@@ -72,23 +71,13 @@ public class AuthController {
     })
 
     @PostMapping("/logout")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> logout(
             @RequestBody @Valid LogoutRequest request,
-            HttpServletRequest httpRequest
+            @RequestHeader("Authorization") String authHeader
             ){
-        String authHeader = httpRequest.getHeader("Authorization");
-
-        // Defense-in-depth: SecurityConfig blocks unauthenticated requests before reaching
-        // this controller. This check handles edge cases where filter chain configuration
-        // changes or the endpoint authorization rules are modified in the future.
-        if (authHeader == null || !authHeader.startsWith("Bearer ")){
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-
-        }
         String accessToken = authHeader.substring(7);
         authUseCase.logout(accessToken, request.refreshToken());
-
-        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
-
+        return ResponseEntity.noContent().build();
     }
 }
