@@ -8,10 +8,15 @@ import com.fleetpulse.api.infrastructure.security.BcryptPasswordHasherAdapter;
 import com.fleetpulse.api.infrastructure.security.JwtAuthenticationFilter;
 import com.fleetpulse.api.infrastructure.security.JwtService;
 import com.fleetpulse.api.infrastructure.security.SpringSecurityUserDetailsAdapter;
+import jakarta.xml.ws.BindingProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.tempuri.ReceiveGPSInfo;
+import org.tempuri.ReceiveGPSInfoSoap;
+
+import java.net.URL;
 
 @Configuration
 public class ApplicationConfig {
@@ -66,6 +71,31 @@ public class ApplicationConfig {
             @Value("${app.initial-admin-password}") String adminPassword
     ){
         return new AdminUserInitializer(userRepository, hasher, adminUsername, adminPassword);
+    }
+
+    @Bean
+    public ReceiveGPSInfoSoap receiveGpsInfoSoap(
+            @Value("${qsolutions.endpoint}") String endpoint,
+            @Value("${qsolutions.connect-timeout-ms}") int connectTimeoutMs,
+            @Value("${qsolutions.read-timeout-ms}") int readTimeoutMs) {
+
+        // WSDL loaded from classpath — not from file:// hardcoded by wsimport
+        URL wsdlUrl = ReceiveGPSInfo.class.getResource("/wsdl/ReceiveGPSInfo.wsdl");
+
+        ReceiveGPSInfo service = new ReceiveGPSInfo(wsdlUrl);
+        ReceiveGPSInfoSoap port = service.getReceiveGPSInfoSoap();
+
+        // Cast to BindingProvider to configure network channel
+        // The proxy implements both ReceiveGPSInfoSoap and BindingProvider at runtime
+        BindingProvider bp = (BindingProvider) port;
+        bp.getRequestContext().put(BindingProvider.ENDPOINT_ADDRESS_PROPERTY, endpoint);
+        bp.getRequestContext().put("com.sun.xml.ws.connect.timeout", connectTimeoutMs);
+        bp.getRequestContext().put("com.sun.xml.ws.request.timeout", readTimeoutMs);
+
+        // NOT thread-safe — JAX-WS port proxy shares a single requestContext (HashMap).
+        // Safe for Phase 4: scheduler dispatches units sequentially (single thread).
+        // REVISIT if concurrent scheduling introduced in Phase 8+: use ThreadLocal or prototype scope.
+        return port;
     }
 
 }

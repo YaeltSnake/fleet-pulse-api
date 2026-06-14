@@ -44,6 +44,11 @@ public class UnitJpaAdapter implements UnitRepository{
         return jpaRepository.existsByNumUnidad(numUnidad);
     }
 
+    @Override
+    public List<String> findAllActiveNumUnidades() {
+        return jpaRepository.findAllActiveNumUnidades();
+    }
+
     private Unit toDomain(UnitEntity entity){
         return new Unit(
                 entity.getNumUnidad(),

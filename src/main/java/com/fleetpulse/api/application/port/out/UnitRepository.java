@@ -11,4 +11,5 @@ public interface UnitRepository {
     List<Unit> findAll();
     void deactivateByNumUnidad(String numUnidad);
     boolean existsByNumUnidad(String numUnidad);
+    List<String> findAllActiveNumUnidades();
 }
