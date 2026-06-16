@@ -3,6 +3,7 @@ package com.fleetpulse.api.infrastructure.config;
 import com.fleetpulse.api.application.port.out.*;
 import com.fleetpulse.api.application.service.AuthService;
 import com.fleetpulse.api.application.service.UserManagementService;
+import com.fleetpulse.api.infrastructure.adapter.out.soap.QSolutionsSoapAdapter;
 import com.fleetpulse.api.infrastructure.init.AdminUserInitializer;
 import com.fleetpulse.api.infrastructure.security.BcryptPasswordHasherAdapter;
 import com.fleetpulse.api.infrastructure.security.JwtAuthenticationFilter;
@@ -96,6 +97,15 @@ public class ApplicationConfig {
         // Safe for Phase 4: scheduler dispatches units sequentially (single thread).
         // REVISIT if concurrent scheduling introduced in Phase 8+: use ThreadLocal or prototype scope.
         return port;
+    }
+
+    @Bean
+    public PulseSender qSolutionsSoapAdapter(
+            ReceiveGPSInfoSoap receiveGpsInfoSoap,
+            @Value("${qsolutions.username}") String username,
+            @Value("${qsolutions.password}") String password,
+            @Value("${qsolutions.proveedor}") String proveedor) {
+        return new QSolutionsSoapAdapter(receiveGpsInfoSoap, username, password, proveedor);
     }
 
 }
