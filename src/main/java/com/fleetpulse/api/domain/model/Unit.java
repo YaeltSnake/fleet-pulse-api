@@ -22,6 +22,11 @@ public class Unit {
         this.active = active;
     }
 
+    // FIXME-SCHEDULE-VALIDATION: This invariant (horaInicio <= horaFin) is currently
+    // unenforced at the entry point. ConfigureScheduleUseCase (Phase 5+) must reject
+    // horaInicio > horaFin at write time so this IllegalStateException becomes
+    // truly unreachable in production, not just documented as an assumption.
+
     // Business invariant: fleet operates daytime only. Overnight schedules
     // (horaInicio > horaFin) are rejected at configuration time by
     // ConfigureScheduleUseCase. This method assumes valid daytime windows.

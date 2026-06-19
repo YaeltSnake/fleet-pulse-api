@@ -1,8 +1,11 @@
 package com.fleetpulse.api.infrastructure.config;
 
+import com.fleetpulse.api.application.port.in.SendPulseUseCase;
 import com.fleetpulse.api.application.port.out.*;
 import com.fleetpulse.api.application.service.AuthService;
+import com.fleetpulse.api.application.service.PulseOrchestrationService;
 import com.fleetpulse.api.application.service.UserManagementService;
+import com.fleetpulse.api.domain.model.FleetConstants;
 import com.fleetpulse.api.infrastructure.adapter.out.soap.QSolutionsSoapAdapter;
 import com.fleetpulse.api.infrastructure.init.AdminUserInitializer;
 import com.fleetpulse.api.infrastructure.security.BcryptPasswordHasherAdapter;
@@ -18,6 +21,7 @@ import org.tempuri.ReceiveGPSInfo;
 import org.tempuri.ReceiveGPSInfoSoap;
 
 import java.net.URL;
+import java.time.Clock;
 
 @Configuration
 public class ApplicationConfig {
@@ -106,6 +110,21 @@ public class ApplicationConfig {
             @Value("${qsolutions.password}") String password,
             @Value("${qsolutions.proveedor}") String proveedor) {
         return new QSolutionsSoapAdapter(receiveGpsInfoSoap, username, password, proveedor);
+    }
+
+    @Bean
+    public Clock clock() {
+        return Clock.system(FleetConstants.FLEET_TIMEZONE);
+    }
+
+    @Bean
+    public PulseOrchestrationService pulseOrchestrationService(
+            UnitRepository unitRepository,
+            GpsCoordinateProvider gpsProvider,
+            PulseSender pulseSender,
+            @Value("${qsolutions.tracking-number}") String defaultTrackingNumber,
+            Clock clock) {
+        return new PulseOrchestrationService(unitRepository, gpsProvider, pulseSender, defaultTrackingNumber, clock);
     }
 
 }
