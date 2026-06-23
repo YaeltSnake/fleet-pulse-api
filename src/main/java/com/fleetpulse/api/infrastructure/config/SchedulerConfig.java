@@ -1,8 +1,10 @@
 package com.fleetpulse.api.infrastructure.config;
 
+import com.fleetpulse.api.application.port.in.ManageRoundUseCase;
 import com.fleetpulse.api.application.port.in.SendPulseUseCase;
 import com.fleetpulse.api.application.port.out.UnitRepository;
 import com.fleetpulse.api.infrastructure.scheduler.PulseSchedulerService;
+import com.fleetpulse.api.infrastructure.scheduler.RoundTickService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,5 +20,10 @@ public class SchedulerConfig {
             SendPulseUseCase sendPulseUseCase,
             UnitRepository unitRepository) {
         return new PulseSchedulerService(sendPulseUseCase, unitRepository);
+    }
+
+    @Bean
+    public RoundTickService roundTickService(ManageRoundUseCase manageRoundUseCase) {
+        return new RoundTickService(manageRoundUseCase);
     }
 }

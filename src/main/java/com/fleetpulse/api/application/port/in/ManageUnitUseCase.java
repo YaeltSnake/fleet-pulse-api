@@ -3,11 +3,11 @@ package com.fleetpulse.api.application.port.in;
 import com.fleetpulse.api.domain.model.Unit;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ManageUnitUseCase {
-    Unit createUnit(Unit unit);
-    Unit updateUnit(Unit unit);
-    void deactivateUnit(String numUnidad);
-    Unit findUnit(String numUnidad);
-    List<Unit> findAllUnits();
+    List<Unit> listAllUnits();
+    Optional<Unit> findByNumUnidad(String numUnidad);
+    Unit activateUnit(String numUnidad);
+    Unit deactivateUnit(String numUnidad);
 }

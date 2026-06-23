@@ -41,6 +41,11 @@ public class GlobalExceptionHandler {
     private static final String SERVICE_UNAVAILABLE = ERROR_BASE + "/service-unavailable";
     private static final String SOAP_REJECTED = ERROR_BASE + "/soap-rejected";
     private static final String MISSING_HEADER = ERROR_BASE + "/missing-header";
+    private static final String UNIT_NOT_ACTIVE = ERROR_BASE + "/unit-not-active";
+    private static final String SCHEDULE_CONFLICT = ERROR_BASE + "/schedule-conflict";
+    private static final String ROUND_ALREADY_ACTIVE = ERROR_BASE + "/round-already-active";
+    private static final String ROUND_NOT_ACTIVE = ERROR_BASE + "/round-not-active";
+    private static final String SCHEDULE_NOT_CONFIGURED = ERROR_BASE + "/schedule-not-configured";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ProblemDetail> handleValidationFailure(
@@ -199,6 +204,102 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
 
+    }
+
+    @ExceptionHandler(UnitNotActiveException.class)
+    public ResponseEntity<ProblemDetail> handleUnitNotActive(
+            RuntimeException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("UNIT_NOT_ACTIVE: {} - path: {}, client: {}",
+                ex.getClass().getSimpleName(),
+                request.getRequestURI(),
+                request.getRemoteAddr());
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problem.setType(URI.create(UNIT_NOT_ACTIVE));
+        problem.setTitle("Unit not active");
+        problem.setDetail("The requested unit is not active and cannot be dispatched");
+        addStandardProperties(problem, request);
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    @ExceptionHandler(ScheduleConflictException.class)
+    public ResponseEntity<ProblemDetail> handleScheduleConflict(
+            RuntimeException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("SCHEDULE_CONFLICT: {} - path: {}, client: {}",
+                ex.getClass().getSimpleName(),
+                request.getRequestURI(),
+                request.getRemoteAddr());
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problem.setType(URI.create(SCHEDULE_CONFLICT));
+        problem.setTitle("Schedule conflict");
+        problem.setDetail("horaInicio must be strictly before horaFin");
+        addStandardProperties(problem, request);
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    @ExceptionHandler(RoundAlreadyActiveException.class)
+    public ResponseEntity<ProblemDetail> handleRoundAlreadyActive(
+            RuntimeException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("ROUND_ALREADY_ACTIVE: {} - path: {}, client: {}",
+                ex.getClass().getSimpleName(),
+                request.getRequestURI(),
+                request.getRemoteAddr());
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problem.setType(URI.create(ROUND_ALREADY_ACTIVE));
+        problem.setTitle("Round already active");
+        problem.setDetail("A dispatch round is already running for this unit. Stop it before starting a new one.");
+        addStandardProperties(problem, request);
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    @ExceptionHandler(RoundNotActiveException.class)
+    public ResponseEntity<ProblemDetail> handleRoundNotActive(
+            RuntimeException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("ROUND_NOT_ACTIVE: {} - path: {}, client: {}",
+                ex.getClass().getSimpleName(),
+                request.getRequestURI(),
+                request.getRemoteAddr());
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problem.setType(URI.create(ROUND_NOT_ACTIVE));
+        problem.setTitle("Round not active");
+        problem.setDetail("No dispatch round is currently active for this unit.");
+        addStandardProperties(problem, request);
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    @ExceptionHandler(ScheduleNotConfiguredException.class)
+    public ResponseEntity<ProblemDetail> handleScheduleNotConfigured(
+            RuntimeException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("SCHEDULE_NOT_CONFIGURED: {} - path: {}, client: {}",
+                ex.getClass().getSimpleName(),
+                request.getRequestURI(),
+                request.getRemoteAddr());
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problem.setType(URI.create(SCHEDULE_NOT_CONFIGURED));
+        problem.setTitle("Schedule not configured");
+        problem.setDetail("No dispatch window is configured for this unit. "
+                + "Use PUT /api/units/{numUnidad}/schedule to set horaInicio and horaFin first.");
+        addStandardProperties(problem, request);
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 
     @ExceptionHandler(UnitNotFoundException.class)
