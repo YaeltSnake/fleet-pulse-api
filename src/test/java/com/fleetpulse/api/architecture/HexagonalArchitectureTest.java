@@ -67,4 +67,26 @@ class HexagonalArchitectureTest {
     static final ArchRule noImplSuffix = noClasses()
             .should().haveSimpleNameEndingWith("Impl")
             .because("'Impl' suffix is a naming anti-pattern; use descriptive adapter/service names");
+
+    // ── Phase 4 additions — enforce ADR-015 and ADR-016 ──────────────────────
+
+    /**
+     * ADR-015: RoundState is a pure Java record in application/service/.
+     * Moving it to infrastructure would require application to import from infrastructure — ArchUnit violation.
+     */
+    @ArchTest
+    static final ArchRule roundStateResidesInApplicationServicePackage = classes()
+            .that().haveSimpleName("RoundState")
+            .should().resideInAPackage("com.fleetpulse.api.application.service")
+            .because("RoundState is a pure-Java record consumed by RoundManagementService (ADR-015)");
+
+    /**
+     * ADR-016: ProviderTestService is the dry-run path — it intentionally has no PulseSender.
+     * Dependency on PulseSender would collapse the test-vs-dispatch separation.
+     */
+    @ArchTest
+    static final ArchRule providerTestServiceDoesNotDependOnPulseSender = noClasses()
+            .that().haveSimpleName("ProviderTestService")
+            .should().dependOnClassesThat().haveSimpleName("PulseSender")
+            .because("ProviderTestService is a read-only dry-run; it must not import PulseSender (ADR-016)");
 }

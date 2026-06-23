@@ -1,9 +1,13 @@
 package com.fleetpulse.api.infrastructure.config;
 
 import com.fleetpulse.api.application.port.in.SendPulseUseCase;
+import com.fleetpulse.api.application.port.in.TestProviderUseCase;
 import com.fleetpulse.api.application.port.out.*;
 import com.fleetpulse.api.application.service.AuthService;
+import com.fleetpulse.api.application.service.ProviderTestService;
 import com.fleetpulse.api.application.service.PulseOrchestrationService;
+import com.fleetpulse.api.application.service.RoundManagementService;
+import com.fleetpulse.api.application.service.UnitManagementService;
 import com.fleetpulse.api.application.service.UserManagementService;
 import com.fleetpulse.api.domain.model.FleetConstants;
 import com.fleetpulse.api.infrastructure.adapter.out.soap.QSolutionsSoapAdapter;
@@ -125,6 +129,29 @@ public class ApplicationConfig {
             @Value("${qsolutions.tracking-number}") String defaultTrackingNumber,
             Clock clock) {
         return new PulseOrchestrationService(unitRepository, gpsProvider, pulseSender, defaultTrackingNumber, clock);
+    }
+
+    @Bean
+    public UnitManagementService unitManagementService(UnitRepository unitRepository) {
+        return new UnitManagementService(unitRepository);
+    }
+
+    @Bean
+    public TestProviderUseCase providerTestService(
+            UnitRepository unitRepository,
+            GpsCoordinateProvider gpsProvider,
+            Clock clock) {
+        return new ProviderTestService(unitRepository, gpsProvider, clock);
+    }
+
+    @Bean
+    public RoundManagementService roundManagementService(
+            UnitRepository unitRepository,
+            SendPulseUseCase sendPulseUseCase,
+            GpsCoordinateProvider gpsProvider,
+            Clock clock,
+            @Value("${scheduler.round.interval-ms}") long roundIntervalMs) {
+        return new RoundManagementService(unitRepository, sendPulseUseCase, gpsProvider, clock, roundIntervalMs);
     }
 
 }

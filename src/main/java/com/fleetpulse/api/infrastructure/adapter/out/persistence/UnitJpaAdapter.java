@@ -5,18 +5,18 @@ import com.fleetpulse.api.domain.model.Unit;
 import com.fleetpulse.api.infrastructure.adapter.out.persistence.entity.UnitEntity;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
 @Component
-public class UnitJpaAdapter implements UnitRepository{
+public class UnitJpaAdapter implements UnitRepository {
 
     private final UnitJpaRepository jpaRepository;
 
     public UnitJpaAdapter(UnitJpaRepository jpaRepository) {
         this.jpaRepository = jpaRepository;
     }
-
 
     @Override
     public Unit save(Unit unit) {
@@ -49,7 +49,22 @@ public class UnitJpaAdapter implements UnitRepository{
         return jpaRepository.findAllActiveNumUnidades();
     }
 
-    private Unit toDomain(UnitEntity entity){
+    @Override
+    public void setActive(String numUnidad, boolean active) {
+        jpaRepository.setActive(numUnidad, active);
+    }
+
+    @Override
+    public void setHorarioFijo(String numUnidad, boolean horarioFijo) {
+        jpaRepository.setHorarioFijo(numUnidad, horarioFijo);
+    }
+
+    @Override
+    public void updateSchedule(String numUnidad, LocalTime horaInicio, LocalTime horaFin) {
+        jpaRepository.updateSchedule(numUnidad, horaInicio, horaFin);
+    }
+
+    private Unit toDomain(UnitEntity entity) {
         return new Unit(
                 entity.getNumUnidad(),
                 entity.isHorarioFijo(),
@@ -60,7 +75,7 @@ public class UnitJpaAdapter implements UnitRepository{
         );
     }
 
-    private UnitEntity toEntity(Unit unit){
+    private UnitEntity toEntity(Unit unit) {
         return UnitEntity.builder()
                 .id(null)
                 .numUnidad(unit.getNumUnidad())

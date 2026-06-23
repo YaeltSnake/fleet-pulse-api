@@ -443,14 +443,14 @@ app.initial-admin-password=testpassword123
 
 | Order | Component | File | Test Type | Tools | Depends On | Status |
 |---|---|---|---|---|---|---|
-| 7.1 | AuthServiceTest | `AuthServiceTest.java` | Unit | Mockito — no Spring | Layer 3 — AuthService ✅ | ⬜ |
-| 7.2 | UserManagementServiceTest | `UserManagementServiceTest.java` | Unit | Mockito — no Spring | Layer 3 — UserManagementService ✅ | ⬜ |
-| 7.3 | AdminUserInitializerTest | `AdminUserInitializerTest.java` | Unit | Mockito — no Spring | Layer 5.7 — AdminUserInitializer ✅ | ⬜ |
-| 7.4 | JwtServiceTest (additions) | `JwtServiceTest.java` | Unit | JUnit 5, JJWT — no Spring | Layer 4.3 — JwtService ✅ | ⬜ additions |
-| 7.5 | RefreshTokenJpaAdapterTest | `RefreshTokenJpaAdapterTest.java` | JPA Integration | `@DataJpaTest` + H2 | Layer 4.1 — RefreshTokenJpaAdapter ✅ | ⬜ |
-| 7.6 | JwtAuthenticationFilterTest | `JwtAuthenticationFilterTest.java` | Security Integration | `@SpringBootTest` + MockMvc + `@MockBean` | Layer 4.5 — JwtAuthenticationFilter ✅ | ⬜ |
-| 7.7 | AuthControllerTest | `AuthControllerTest.java` | Controller Integration | `@SpringBootTest` + MockMvc + `@MockBean` | Layer 5 — AuthController ✅, GlobalExceptionHandler ✅ | ⬜ |
-| 7.8 | ArchUnit (expansion) | `HexagonalArchitectureTest.java` | Architecture | ArchUnit — no Spring | All layers ✅ | ⬜ additions |
+| 7.1 | AuthServiceTest | `AuthServiceTest.java` | Unit | Mockito — no Spring | Layer 3 — AuthService ✅ | ✅ |
+| 7.2 | UserManagementServiceTest | `UserManagementServiceTest.java` | Unit | Mockito — no Spring | Layer 3 — UserManagementService ✅ | ✅ |
+| 7.3 | AdminUserInitializerTest | `AdminUserInitializerTest.java` | Unit | Mockito — no Spring | Layer 5.7 — AdminUserInitializer ✅ | ✅ |
+| 7.4 | JwtServiceTest (additions) | `JwtServiceTest.java` | Unit | JUnit 5, JJWT — no Spring | Layer 4.3 — JwtService ✅ | ✅ |
+| 7.5 | RefreshTokenJpaAdapterTest | `RefreshTokenJpaAdapterTest.java` | JPA Integration | `@DataJpaTest` + H2 | Layer 4.1 — RefreshTokenJpaAdapter ✅ | ✅ |
+| 7.6 | JwtAuthenticationFilterTest | `JwtAuthenticationFilterTest.java` | Security Integration | `@SpringBootTest` + MockMvc + `@MockBean` | Layer 4.5 — JwtAuthenticationFilter ✅ | ✅ |
+| 7.7 | AuthControllerTest | `AuthControllerTest.java` | Controller Integration | `@SpringBootTest` + MockMvc + `@MockBean` | Layer 5 — AuthController ✅, GlobalExceptionHandler ✅ | ✅ |
+| 7.8 | ArchUnit (expansion) | `HexagonalArchitectureTest.java` | Architecture | ArchUnit — no Spring | All layers ✅ | ✅ |
 
 **Recommended implementation order: 7.1 → 7.2 → 7.3 → 7.4 → 7.5 → 7.6 → 7.7 → 7.8**
 (unit tests first — fastest feedback; `@SpringBootTest` tests last — slowest startup)
@@ -769,8 +769,8 @@ A full E2E smoke test with zero mocks (real MySQL + real Redis + real JWT + real
 
 ---
 
-## Phase 4 — Dispatch Engine + API Contract Freeze ⚠️ Highest Risk
-**Tag:** `v0.4.0`
+## Phase 4 — Dispatch Engine + API Contract Freeze ✅ COMPLETE
+**Tag:** `v0.4.0` — READY TO TAG
 **Exit condition:** (1) SOAP confirmed live: force-dispatch triggers `Protocolo.isProcessed() == true` against live QSolutions endpoint. (2) Global scheduler disabled by default (`scheduler.pulse.global-enabled=false`); per-unit round scheduling starts, ticks, and stops via API — double-start 409, stop-when-not-active 409, `horarioFijo == false` with hours persists to DB before map insert. (3) Full Unit CRUD + schedule management API operational — all 6 `UnitController` endpoints return correct status codes with valid JWT. (4) React contract frozen: `UnitResponse` shape (including `roundActive` boolean) documented and stable. All tests green (ArchUnit passes, no `@Component` violations). Auditable `Protocolo` response pasted in GitHub release notes before tagging.
 
 > ⚠️ **LIVE EXTERNAL SERVICE.** No sandbox. Every broken payload hits production QSolutions. Do not ship until all unit tests are green and the `@Disabled` live integration test is manually verified.
@@ -879,12 +879,12 @@ Add to `UnitJpaAdapter` — delegates to the Spring Data method.
 
 | Status | Task |
 |---|---|
-| ⬜ | Add 4 property blocks to `application.properties` (SOAP timeouts, manual GPS map, provider selector, scheduler interval) |
-| ⬜ | Add same env vars to `.env.example` and `.env` |
-| ⬜ | Create `ManualCoordinateProperties.java` |
-| ⬜ | Add `receiveGpsInfoSoap()` @Bean to `ApplicationConfig` — classpath WSDL + endpoint override + timeouts |
-| ⬜ | Add `findAllActiveNumUnidades()` to `UnitRepository` port + `UnitJpaAdapter` + `UnitJpaRepository` |
-| ⬜ | `mvn test` — ArchUnit passes, no `@Value` binding errors |
+| ✅ | Add 4 property blocks to `application.properties` (SOAP timeouts, manual GPS map, provider selector, scheduler interval) |
+| ✅ | Add same env vars to `.env.example` and `.env` |
+| ✅ | Create `ManualCoordinateProperties.java` |
+| ✅ | Add `receiveGpsInfoSoap()` @Bean to `ApplicationConfig` — classpath WSDL + endpoint override + timeouts |
+| ✅ | Add `findAllActiveNumUnidades()` to `UnitRepository` port + `UnitJpaAdapter` + `UnitJpaRepository` |
+| ✅ | `mvn test` — ArchUnit passes, no `@Value` binding errors |
 
 Exit condition: Application context starts without errors. `receiveGpsInfoSoap()` resolves from classpath WSDL (no network call at startup). `ManualCoordinateProperties` binds correctly for all 5 units. `findAllActiveNumUnidades()` method compiles and exists in port interface.
 
@@ -949,13 +949,13 @@ Catch only the two specific cases above. All other exceptions propagate unchange
 
 | Status | Task |
 |---|---|
-| ⬜ | Create `QSolutionsSoapAdapter.java` implementing `PulseSender` |
-| ⬜ | `send(ScheduledPulse)` maps all 8 required `GPSInfo` fields |
-| ⬜ | `toXmlCalendar(ZonedDateTime)` uses `FLEET_TIMEZONE` with static `DatatypeFactory` |
-| ⬜ | `Processed=false` → `PulseSendException`; `WebServiceException` → `GpsProviderUnavailableException` |
-| ⬜ | `password` field never appears in any log output |
-| ⬜ | Declare `QSolutionsSoapAdapter` as `@Bean` in `ApplicationConfig` — inject `ReceiveGPSInfoSoap` port + `@Value` credentials |
-| ⬜ | `mvn test` — ArchUnit passes (no `@Component`, no Spring imports in adapter) |
+| ✅ | Create `QSolutionsSoapAdapter.java` implementing `PulseSender` |
+| ✅ | `send(ScheduledPulse)` maps all 8 required `GPSInfo` fields |
+| ✅ | `toXmlCalendar(ZonedDateTime)` uses `FLEET_TIMEZONE` with static `DatatypeFactory` |
+| ✅ | `Processed=false` → `PulseSendException`; `WebServiceException` → `GpsProviderUnavailableException` |
+| ✅ | `password` field never appears in any log output |
+| ✅ | Declare `QSolutionsSoapAdapter` as `@Bean` in `ApplicationConfig` — inject `ReceiveGPSInfoSoap` port + `@Value` credentials |
+| ✅ | `mvn test` — ArchUnit passes (no `@Component`, no Spring imports in adapter) |
 
 Exit condition: Adapter compiles. ArchUnit passes. Credentials never in source code. `PulseSendException` and `GpsProviderUnavailableException` thrown in correct cases (verified in 8.1 unit tests).
 
@@ -1047,13 +1047,13 @@ public class GpsProviderConfig {
 
 | Status | Task |
 |---|---|
-| ⬜ | Create `ManualCoordinateAdapter.java` implementing `GpsCoordinateProvider` |
-| ⬜ | Constructor builds `Collections.unmodifiableMap` from `ManualCoordinateProperties` |
-| ⬜ | `isAvailable` — O(1) `containsKey`, zero I/O |
-| ⬜ | `getCoordinates` — returns fresh `GpsReading` with `ZonedDateTime.now(FLEET_TIMEZONE)` and `ProviderType.MANUAL` |
-| ⬜ | Create `GpsProviderConfig.java` with `@ConditionalOnProperty(matchIfMissing = true)` + `@EnableConfigurationProperties(ManualCoordinateProperties.class)` |
-| ⬜ | Verify exactly one `GpsCoordinateProvider` bean resolves in `@SpringBootTest` context |
-| ⬜ | `mvn test` — ArchUnit passes |
+| ✅ | Create `ManualCoordinateAdapter.java` implementing `GpsCoordinateProvider` |
+| ✅ | Constructor builds `Collections.unmodifiableMap` from `ManualCoordinateProperties` |
+| ✅ | `isAvailable` — O(1) `containsKey`, zero I/O |
+| ✅ | `getCoordinates` — returns fresh `GpsReading` with `ZonedDateTime.now(FLEET_TIMEZONE)` and `ProviderType.MANUAL` |
+| ✅ | Create `GpsProviderConfig.java` with `@ConditionalOnProperty(matchIfMissing = true)` + `@EnableConfigurationProperties(ManualCoordinateProperties.class)` |
+| ✅ | Verify exactly one `GpsCoordinateProvider` bean resolves in `@SpringBootTest` context |
+| ✅ | `mvn test` — ArchUnit passes |
 
 Exit condition: Adapter compiles. `isAvailable` returns correct boolean for configured and unconfigured units without any external calls. Exactly one `GpsCoordinateProvider` bean — `ManualCoordinateAdapter`. ArchUnit passes.
 
@@ -1186,13 +1186,13 @@ The `Clock` `@Bean` declared here resolves `FIXME-CLOCK` from known debt (CLAUDE
 
 | Status | Task |
 |---|---|
-| ⬜ | Add `dispatch(String numUnidad, GpsReading gpsReading)` to `SendPulseUseCase` port |
-| ⬜ | Update `PulseOrchestrationService.java` — inject `Clock`, remove stray Spanish comments, add `dispatch()` implementation |
-| ⬜ | `sendPulse()` uses `LocalTime.now(clock)` (not `LocalTime.now(FLEET_TIMEZONE)`) |
-| ⬜ | `dispatch()` throws `UnitNotActiveException` (not silent skip) |
-| ⬜ | `effectiveTrackingNumber` resolves: `unit.getTrackingNumber() != null` → unit value, else `defaultTrackingNumber` |
-| ⬜ | Add `Clock @Bean` + update `pulseOrchestrationService()` @Bean in `ApplicationConfig` to pass `Clock` |
-| ⬜ | `mvn test` — ArchUnit passes (no `@Service`, no `@Transactional`, no Spring imports in `application/`) |
+| ✅ | Add `dispatch(String numUnidad, GpsReading gpsReading)` to `SendPulseUseCase` port |
+| ✅ | Update `PulseOrchestrationService.java` — inject `Clock`, remove stray Spanish comments, add `dispatch()` implementation |
+| ✅ | `sendPulse()` uses `LocalTime.now(clock)` (not `LocalTime.now(FLEET_TIMEZONE)`) |
+| ✅ | `dispatch()` throws `UnitNotActiveException` (not silent skip) |
+| ✅ | `effectiveTrackingNumber` resolves: `unit.getTrackingNumber() != null` → unit value, else `defaultTrackingNumber` |
+| ✅ | Add `Clock @Bean` + update `pulseOrchestrationService()` @Bean in `ApplicationConfig` to pass `Clock` |
+| ✅ | `mvn test` — ArchUnit passes (no `@Service`, no `@Transactional`, no Spring imports in `application/`) |
 
 Exit condition: Service compiles. `FIXME-CLOCK` resolved. Both `sendPulse()` and `dispatch()` paths covered by 9.3 unit tests with `Clock.fixed`. ArchUnit passes.
 
@@ -1269,12 +1269,12 @@ Rules:
 
 | Status | Task |
 |---|---|
-| ⬜ | Create `SchedulerConfig.java` with `@EnableScheduling` and `@ConditionalOnProperty` `pulseSchedulerService()` @Bean |
-| ⬜ | Add `scheduler.pulse.global-enabled=false` to `application.properties` |
-| ⬜ | Create `PulseSchedulerService.java` with `@Scheduled(fixedRateString)` dispatch method |
-| ⬜ | Per-unit exception catch — failure of one unit never aborts the cycle |
-| ⬜ | `SCHEDULER_TICK_START` and `SCHEDULER_TICK_END` logged with unit count |
-| ⬜ | No `@Component` on `PulseSchedulerService` — `mvn test` ArchUnit passes |
+| ✅ | Create `SchedulerConfig.java` with `@EnableScheduling` and `@ConditionalOnProperty` `pulseSchedulerService()` @Bean |
+| ✅ | Add `scheduler.pulse.global-enabled=false` to `application.properties` |
+| ✅ | Create `PulseSchedulerService.java` with `@Scheduled(fixedRateString)` dispatch method |
+| ✅ | Per-unit exception catch — failure of one unit never aborts the cycle |
+| ✅ | `SCHEDULER_TICK_START` and `SCHEDULER_TICK_END` logged with unit count |
+| ✅ | No `@Component` on `PulseSchedulerService` — `mvn test` ArchUnit passes |
 
 Exit condition: Context starts with `scheduler.pulse.global-enabled=false` — `PulseSchedulerService` bean absent. Scheduler fires on configured interval when enabled. Per-unit failure does not abort the cycle. `SCHEDULER_TICK_END` logged after every tick.
 
@@ -1496,19 +1496,19 @@ public ResponseEntity<ProblemDetail> handleScheduleConflict(ScheduleConflictExce
 
 | Status | Task |
 |---|---|
-| ⬜ | Create `UnitNotActiveException` and `ScheduleConflictException` domain exceptions |
-| ⬜ | Add 2 `@ExceptionHandler` entries to `GlobalExceptionHandler` |
-| ⬜ | Create `ManageUnitUseCase` port (`application/port/in/`) |
-| ⬜ | Verify or create `ConfigureScheduleUseCase` port with `updateSchedule()` signature |
-| ⬜ | Add `setActive()`, `setHorarioFijo()`, `updateSchedule()` to `UnitRepository` port + `@Modifying @Query` in `UnitJpaRepository` + delegation in `UnitJpaAdapter` |
-| ⬜ | Create `UnitManagementService` implementing both use cases — ADR-013 sentinel for null hours |
-| ⬜ | Add `unitManagementService()` @Bean to `ApplicationConfig` |
-| ⬜ | Create `UnitResponse` DTO record with `roundActive` and `currentCoordinateMode` fields and `from(Unit, boolean, CoordinateMode)` factory |
-| ⬜ | Create `ScheduleUpdateRequest` DTO record |
-| ⬜ | Create `UnitController` with 5 endpoints (GET list, GET single, PUT activate, PUT deactivate, PUT schedule) |
-| ⬜ | Add 5 `requestMatchers` entries to `SecurityConfig` matrix |
-| ⬜ | `@Tag`, `@Operation`, `@ApiResponse` on all `UnitController` methods |
-| ⬜ | `mvn test` — ArchUnit passes, `UnitResponse` is a record |
+| ✅ | Create `UnitNotActiveException` and `ScheduleConflictException` domain exceptions |
+| ✅ | Add 2 `@ExceptionHandler` entries to `GlobalExceptionHandler` |
+| ✅ | Create `ManageUnitUseCase` port (`application/port/in/`) |
+| ✅ | Verify or create `ConfigureScheduleUseCase` port with `updateSchedule()` signature |
+| ✅ | Add `setActive()`, `setHorarioFijo()`, `updateSchedule()` to `UnitRepository` port + `@Modifying @Query` in `UnitJpaRepository` + delegation in `UnitJpaAdapter` |
+| ✅ | Create `UnitManagementService` implementing both use cases — ADR-013 sentinel for null hours |
+| ✅ | Add `unitManagementService()` @Bean to `ApplicationConfig` |
+| ✅ | Create `UnitResponse` DTO record with `roundActive` and `currentCoordinateMode` fields and `from(Unit, boolean, CoordinateMode)` factory |
+| ✅ | Create `ScheduleUpdateRequest` DTO record |
+| ✅ | Create `UnitController` with 5 endpoints (GET list, GET single, PUT activate, PUT deactivate, PUT schedule) |
+| ✅ | Add 5 `requestMatchers` entries to `SecurityConfig` matrix |
+| ✅ | `@Tag`, `@Operation`, `@ApiResponse` on all `UnitController` methods |
+| ✅ | `mvn test` — ArchUnit passes, `UnitResponse` is a record |
 
 Exit condition: All 5 `UnitController` endpoints return correct HTTP status codes with valid JWT. `roundActive` field in `UnitResponse` reflects current in-memory round state. `PUT /schedule` with `horaInicio >= horaFin` returns 409. ADR-013 sentinel verified: `horarioFijo=false` with null hours writes `(LocalTime.MIN, LocalTime.MAX)` to DB. ArchUnit passes. `mvn test` green.
 
@@ -1798,22 +1798,22 @@ public record RoundStartRequest(
 
 | Status | Task |
 |---|---|
-| ⬜ | Add `scheduler.round.tick-ms` and `scheduler.round.interval-ms` to `application.properties` and `.env.example` |
-| ⬜ | Verify `updateSchedule(String, LocalTime, LocalTime)` exists in `UnitRepository` port (declared in Layer 6) — no new declaration needed here |
-| ⬜ | Add 3 new domain exceptions: `RoundAlreadyActiveException`, `RoundNotActiveException`, `ScheduleNotConfiguredException` (`UnitNotActiveException` declared in Layer 6) |
-| ⬜ | Add 3 `@ExceptionHandler` entries to `GlobalExceptionHandler` (409 each) + verify `UnitNotActiveException` handler exists from Layer 6 |
-| ⬜ | Create `ManageRoundUseCase` port (`application/port/in/`) — `startRound(numUnidad, coordinateMode, manualLat, manualLon)`, `stopRound`, `isRoundActive`, `getRoundCoordinateMode` |
-| ⬜ | Add `getRoundCoordinateMode(String numUnidad)` to `ManageRoundUseCase` port — returns `@Nullable CoordinateMode` |
-| ⬜ | Create `RoundState` record (`application/service/RoundState.java`) — 6 fields including `coordinateMode`, `manualLat`, `manualLon` |
-| ⬜ | Create `RoundManagementService` (`application/service/`) — constructor injects `gpsProvider`; `startRound()` reads schedule from DB, throws `ScheduleNotConfiguredException` on sentinel; `processTick()` branches on MANUAL/AUTOMATIC; `getRoundCoordinateMode()` is O(1) map lookup; auto-removes on `GpsProviderUnavailableException` and `UnitNotActiveException` |
-| ⬜ | Implement `getRoundCoordinateMode()` in `RoundManagementService` — `activeRounds.get(numUnidad)`, returns `state.coordinateMode()` or `null` |
-| ⬜ | Add `Clock` `@Bean` + `roundManagementService()` `@Bean` to `ApplicationConfig` — include `GpsCoordinateProvider gpsProvider` param; return type `RoundManagementService` |
-| ⬜ | Create `RoundTickService` (`infrastructure/scheduler/`) — `@Scheduled(fixedRateString)`, delegates to `processTick()` |
-| ⬜ | Add `roundTickService()` `@Bean` to `SchedulerConfig` |
-| ⬜ | Create `RoundStartRequest` DTO record (`infrastructure/adapter/in/web/dto/`) — 3 fields: `coordinateMode` (@NotNull), `lat`, `lon` (@Nullable BigDecimal) — no hours fields |
-| ⬜ | Create `RoundController` with start + stop endpoints + OpenAPI `@Tag`/`@Operation`/`@ApiResponse` |
-| ⬜ | Add 2 `requestMatchers` entries to `SecurityConfig` matrix |
-| ⬜ | `mvn test` — ArchUnit passes (no `@Component` on `RoundTickService`, no Spring imports in `RoundManagementService`) |
+| ✅ | Add `scheduler.round.tick-ms` and `scheduler.round.interval-ms` to `application.properties` and `.env.example` |
+| ✅ | Verify `updateSchedule(String, LocalTime, LocalTime)` exists in `UnitRepository` port (declared in Layer 6) — no new declaration needed here |
+| ✅ | Add 3 new domain exceptions: `RoundAlreadyActiveException`, `RoundNotActiveException`, `ScheduleNotConfiguredException` (`UnitNotActiveException` declared in Layer 6) |
+| ✅ | Add 3 `@ExceptionHandler` entries to `GlobalExceptionHandler` (409 each) + verify `UnitNotActiveException` handler exists from Layer 6 |
+| ✅ | Create `ManageRoundUseCase` port (`application/port/in/`) — `startRound(numUnidad, coordinateMode, manualLat, manualLon)`, `stopRound`, `isRoundActive`, `getRoundCoordinateMode` |
+| ✅ | Add `getRoundCoordinateMode(String numUnidad)` to `ManageRoundUseCase` port — returns `@Nullable CoordinateMode` |
+| ✅ | Create `RoundState` record (`application/service/RoundState.java`) — 6 fields including `coordinateMode`, `manualLat`, `manualLon` |
+| ✅ | Create `RoundManagementService` (`application/service/`) — constructor injects `gpsProvider`; `startRound()` reads schedule from DB, throws `ScheduleNotConfiguredException` on sentinel; `processTick()` branches on MANUAL/AUTOMATIC; `getRoundCoordinateMode()` is O(1) map lookup; auto-removes on `GpsProviderUnavailableException` and `UnitNotActiveException` |
+| ✅ | Implement `getRoundCoordinateMode()` in `RoundManagementService` — `activeRounds.get(numUnidad)`, returns `state.coordinateMode()` or `null` |
+| ✅ | Add `Clock` `@Bean` + `roundManagementService()` `@Bean` to `ApplicationConfig` — include `GpsCoordinateProvider gpsProvider` param; return type `RoundManagementService` |
+| ✅ | Create `RoundTickService` (`infrastructure/scheduler/`) — `@Scheduled(fixedRateString)`, delegates to `processTick()` |
+| ✅ | Add `roundTickService()` `@Bean` to `SchedulerConfig` |
+| ✅ | Create `RoundStartRequest` DTO record (`infrastructure/adapter/in/web/dto/`) — 3 fields: `coordinateMode` (@NotNull), `lat`, `lon` (@Nullable BigDecimal) — no hours fields |
+| ✅ | Create `RoundController` with start + stop endpoints + OpenAPI `@Tag`/`@Operation`/`@ApiResponse` |
+| ✅ | Add 2 `requestMatchers` entries to `SecurityConfig` matrix |
+| ✅ | `mvn test` — ArchUnit passes (no `@Component` on `RoundTickService`, no Spring imports in `RoundManagementService`) |
 
 Exit condition: `POST /api/units/{numUnidad}/round/start` with MANUAL coords returns 204. Missing lat/lon for MANUAL returns 400. AUTOMATIC mode returns 400 (FIXME-PHASE6 guard). `processTick()` dispatches the unit on the next qualifying tick using stored coords (verified via unit test with `Clock.fixed`). `processTick()` auto-removes round on `GpsProviderUnavailableException` (AUTOMATIC path) and `UnitNotActiveException`. `POST /api/units/{numUnidad}/round/stop` returns 204 and the unit no longer dispatches. Double-start returns 409. Stop when not active returns 409. `startRound()` with sentinel schedule throws `ScheduleNotConfiguredException` — caller must configure via `PUT /schedule` first (verified in `RoundManagementServiceTest`). `Clock @Bean` resolves `FIXME-CLOCK`. ArchUnit passes. `mvn test` green.
 
@@ -2027,21 +2027,21 @@ public TestProviderUseCase providerTestService(
 
 | Status | Task |
 |---|---|
-| ⬜ | Create `ForcePulseRequest` DTO record |
-| ⬜ | Update `PulseController` — validate `coordinateMode`, assemble `GpsReading`, call `sendPulseUseCase.dispatch()` |
-| ⬜ | Add `FIXME-PHASE6` comment in `PulseController` for AUTOMATIC mode guard |
-| ⬜ | Add `POST /api/units/*/pulse/force` to `SecurityConfig` matrix |
-| ⬜ | Create `TestProviderUseCase` port (`application/port/in/`) — declare both `testProvider()` and `testProviderWithOverride()` |
-| ⬜ | Create `ProviderTestService` (`application/service/`) — inject `Clock`; no `PulseSender` injection |
-| ⬜ | Implement `testProvider()` — provider availability check + `getCoordinates()`; never calls `PulseSender` |
-| ⬜ | Implement `testProviderWithOverride()` — builds `GpsReading` with caller-supplied coords + `ZonedDateTime.now(clock)`; never calls `gpsProvider` or `PulseSender` |
-| ⬜ | Add `providerTestService()` @Bean to `ApplicationConfig` — pass `Clock` parameter |
-| ⬜ | Create `ManualCoordinateTestRequest` DTO record (`@NotNull lat`, `@NotNull lon`) |
-| ⬜ | Create `ProviderTestResponse` DTO record |
-| ⬜ | Create `ProviderTestController` with `GET /{numUnidad}/pulse/test` and `POST /{numUnidad}/pulse/test-manual` |
-| ⬜ | Add `POST /api/units/*/pulse/test-manual` to `SecurityConfig` matrix |
-| ⬜ | Add `GET /api/units/*/pulse/test` to `SecurityConfig` matrix |
-| ⬜ | `mvn test` — ArchUnit passes (no `PulseSender` field in `ProviderTestService`) |
+| ✅ | Create `ForcePulseRequest` DTO record |
+| ✅ | Update `PulseController` — validate `coordinateMode`, assemble `GpsReading`, call `sendPulseUseCase.dispatch()` |
+| ✅ | Add `FIXME-PHASE6` comment in `PulseController` for AUTOMATIC mode guard |
+| ✅ | Add `POST /api/units/*/pulse/force` to `SecurityConfig` matrix |
+| ✅ | Create `TestProviderUseCase` port (`application/port/in/`) — declare both `testProvider()` and `testProviderWithOverride()` |
+| ✅ | Create `ProviderTestService` (`application/service/`) — inject `Clock`; no `PulseSender` injection |
+| ✅ | Implement `testProvider()` — provider availability check + `getCoordinates()`; never calls `PulseSender` |
+| ✅ | Implement `testProviderWithOverride()` — builds `GpsReading` with caller-supplied coords + `ZonedDateTime.now(clock)`; never calls `gpsProvider` or `PulseSender` |
+| ✅ | Add `providerTestService()` @Bean to `ApplicationConfig` — pass `Clock` parameter |
+| ✅ | Create `ManualCoordinateTestRequest` DTO record (`@NotNull lat`, `@NotNull lon`) |
+| ✅ | Create `ProviderTestResponse` DTO record |
+| ✅ | Create `ProviderTestController` with `GET /{numUnidad}/pulse/test` and `POST /{numUnidad}/pulse/test-manual` |
+| ✅ | Add `POST /api/units/*/pulse/test-manual` to `SecurityConfig` matrix |
+| ✅ | Add `GET /api/units/*/pulse/test` to `SecurityConfig` matrix |
+| ✅ | `mvn test` — ArchUnit passes (no `PulseSender` field in `ProviderTestService`) |
 
 Exit condition: `POST /pulse/force` with MANUAL coords returns 204. Missing coords returns 400. `GET /pulse/test` returns `ProviderTestResponse` with zero SOAP calls — verified by `verify(sendPulseUseCase, never()).dispatch(any(), any())` in 9.10. ArchUnit passes.
 
@@ -2050,6 +2050,10 @@ Exit condition: `POST /pulse/force` with MANUAL coords returns 204. Missing coor
 ### Layer 9 — Tests
 
 **Exit condition for Phase 4:** `mvn test` passes with zero failures. All 11 component tests green. `@Disabled` live integration test run manually with `Protocolo.isProcessed() == true` evidence in release notes.
+
+**Result (2026-06-23):** ✅ 235 passing, 2 skipped (@Disabled live gate). All spec cases implemented including previously missing: timezone conversion assertion (9.1.6), password-not-logged assertion (9.1.7), timestamp freshness (9.2.7), all-5-units coverage (9.2.8), `sendPulse` exception propagation (9.3.16–17), `dispatch_neverCallsGpsProvider` ADR-016 enforcement (9.3.18).
+
+**Live gate PASSED (2026-06-23 17:01 CST):** `PULSE_SENT numUnidad=Peugeot tracking=test-tracking receptionDate=2026-06-23T17:01:45.703765300-06:00[America/Mexico_City]` — `Protocolo.isProcessed() == true` confirmed against live QSolutions endpoint. All 4 Phase 4 exit conditions met. ✅
 
 #### Dependency Rules
 
@@ -2064,17 +2068,27 @@ Exit condition: `POST /pulse/force` with MANUAL coords returns 204. Missing coor
 
 | Order | Component | File | Test Type | Depends On | Status |
 |---|---|---|---|---|---|
-| 9.1 | QSolutionsSoapAdapterTest | `QSolutionsSoapAdapterTest.java` | Unit + @Disabled live | Layer 2 | ⬜ |
-| 9.2 | ManualCoordinateAdapterTest | `ManualCoordinateAdapterTest.java` | Unit | Layer 3 | ⬜ |
-| 9.3 | PulseOrchestrationServiceTest | `PulseOrchestrationServiceTest.java` | Unit (Mockito) — 14 cases | Layer 4 | ⬜ |
-| 9.4 | RoundManagementServiceTest | `RoundManagementServiceTest.java` | Unit (Mockito + Clock) — 23 cases | Layer 7 | ⬜ |
-| 9.5 | UnitManagementServiceTest | `UnitManagementServiceTest.java` | Unit (Mockito) — 10 cases | Layer 6 | ⬜ |
-| 9.6 | ProviderTestServiceTest | `ProviderTestServiceTest.java` | Unit (Mockito + Clock) — 8 cases | Layer 8 | ⬜ |
-| 9.7 | PulseControllerTest | `PulseControllerTest.java` | Controller integration — 9 cases | Layer 8 | ⬜ |
-| 9.8 | RoundControllerTest | `RoundControllerTest.java` | Controller integration — 13 cases | Layer 7 | ⬜ |
-| 9.9 | UnitControllerTest | `UnitControllerTest.java` | Controller integration — 10 cases | Layer 6 | ⬜ |
-| 9.10 | ProviderTestControllerTest | `ProviderTestControllerTest.java` | Controller integration — 9 cases | Layer 8 | ⬜ |
-| 9.11 | ArchUnit additions | `HexagonalArchitectureTest.java` | Architecture | All layers | ⬜ |
+| 9.1 | QSolutionsSoapAdapterTest | `QSolutionsSoapAdapterTest.java` | Unit (7 cases) + @Disabled live gate | Layer 2 | ✅ |
+| 9.2 | ManualCoordinateAdapterTest | `ManualCoordinateAdapterTest.java` | Unit — 8 cases (+2 extra) | Layer 3 | ✅ |
+| 9.3 | PulseOrchestrationServiceTest | `PulseOrchestrationServiceTest.java` | Unit (Mockito) — 18 cases (+4 extra) | Layer 4 | ✅ |
+| 9.4 | RoundManagementServiceTest | `RoundManagementServiceTest.java` | Unit (Mockito + Clock) — 25 cases (+2 extra) | Layer 7 | ✅ |
+| 9.5 | UnitManagementServiceTest | `UnitManagementServiceTest.java` | Unit (Mockito) — 11 cases (+1 extra) | Layer 6 | ✅ |
+| 9.6 | ProviderTestServiceTest | `ProviderTestServiceTest.java` | Unit (Mockito + Clock) — 8 cases | Layer 8 | ✅ |
+| 9.7 | PulseControllerTest | `PulseControllerTest.java` | Controller integration — 9 cases | Layer 8 | ✅ |
+| 9.8 | RoundControllerTest | `RoundControllerTest.java` | Controller integration — 13 cases | Layer 7 | ✅ |
+| 9.9 | UnitControllerTest | `UnitControllerTest.java` | Controller integration — 11 cases (+1 extra) | Layer 6 | ✅ |
+| 9.10 | ProviderTestControllerTest | `ProviderTestControllerTest.java` | Controller integration — 9 cases | Layer 8 | ✅ |
+| 9.11 | ArchUnit additions | `HexagonalArchitectureTest.java` | Architecture — 2 new Phase 4 rules | All layers | ✅ |
+
+#### Discovered Additional Cases (SUT analysis surfaced during implementation)
+
+| # | Test Class | Extra Case | Rationale |
+|---|---|---|---|
+| +1 | `PulseOrchestrationServiceTest` | `dispatch_withNullGpsReading_throwsNullPointerException` | `dispatch()` null-guard via `Objects.requireNonNull` — not in original spec but enforced by constructor of `ScheduledPulse` |
+| +2 | `RoundManagementServiceTest` | `startRound_withZeroZeroCoordinates_throwsInvalidCoordinateException` | `GpsReading` constructor rejects `(0.0, 0.0)` as "GPS not locked" — happens BEFORE sentinel schedule check |
+| +3 | `RoundManagementServiceTest` | `processTick_whenUltimoEnvioIsNull_dispatches` | First-tick case: `ultimoEnvio == null` is an explicit branch in `processTick()` that skips the cooldown check entirely |
+| +4 | `UnitManagementServiceTest` | `updateSchedule_withUnknownUnit_throwsUnitNotFoundException` | Unit lookup must be the first DB call in `updateSchedule()` — validates "not-found before validation" ordering |
+| +5 | `UnitControllerTest` | `activateUnit_withUserRole_returns403` | SecurityConfig's `hasAuthority("ADMIN")` on `PUT /api/units/*/activate` must reject USER at the filter/security level — not just at service level |
 
 #### 9.1 — QSolutionsSoapAdapterTest
 
@@ -2492,21 +2506,18 @@ class ProviderTestControllerTest {
 
 ---
 
-#### 9.11 — ArchUnit additions
+#### 9.11 — ArchUnit additions (✅ IMPLEMENTED)
 
-File: `src/test/java/com/fleetpulse/api/architecture/HexagonalArchitectureTest.java` — add to existing class.
+File: `src/test/java/com/fleetpulse/api/architecture/HexagonalArchitectureTest.java` — added to existing class.
 
-| Rule | What it enforces |
-|---|---|
-| `noClassInSchedulerPackageAnnotatedWithComponent` | `infrastructure/scheduler/` classes must not use `@Component` — covers `PulseSchedulerService` and `RoundTickService` |
-| `noSoapAdapterAnnotatedWithComponent` | `infrastructure/adapter/out/soap/` must not use `@Component` |
-| `noGpsAdapterAnnotatedWithComponent` | `infrastructure/adapter/out/gps/` must not use `@Component` |
-| `manageRoundUseCaseInApplicationPortIn` | `ManageRoundUseCase` must reside in `application/port/in/` |
-| `coordinateModeInDomainModel` | `CoordinateMode` enum must reside in `domain/model/` |
-| `roundStateDoesNotImportSpringOrInfrastructure` | `application/service/RoundState` must not import `org.springframework` or `infrastructure` packages |
-| `providerTestServiceDoesNotDeclareFieldOfTypePulseSender` | `ProviderTestService` must not have a field of type `PulseSender` — dry-run contract |
+Two Phase 4 rules added (total: 11 rules now in class):
 
-Note: existing `applicationDoesNotImportInfrastructure` and `applicationDoesNotImportSpring` rules cover `RoundManagementService`, `RoundState`, and `UnitManagementService`. The rules above add enforcement specific to Phase 4 additions.
+| Rule | ADR | What it enforces |
+|---|---|---|
+| `roundStateResidesInApplicationServicePackage` | ADR-015 | `RoundState` must reside in `application/service/` — moving to `infrastructure/` would require application to import infrastructure (ArchUnit violation) |
+| `providerTestServiceDoesNotDependOnPulseSender` | ADR-016 | `ProviderTestService` must not import `PulseSender` — dry-run path intentionally has zero SOAP access |
+
+Note: existing `applicationDoesNotImportInfrastructure` and `applicationDoesNotImportSpring` rules already cover `RoundManagementService`, `RoundState`, `UnitManagementService`. The two rules above add Phase 4-specific named enforcement.
 
 #### Blocked States
 
@@ -2528,16 +2539,13 @@ Note: existing `applicationDoesNotImportInfrastructure` and `applicationDoesNotI
 9.11 runs last.
 ```
 
-#### Live Integration Gate (mandatory before v0.4.0 tag)
+#### Live Integration Gate — ✅ PASSED 2026-06-23
 
-1. Ensure `.env` has live QSolutions credentials (`QSOLUTIONS_USERNAME`, `QSOLUTIONS_PASSWORD`, `QSOLUTIONS_PROVEEDOR`)
-2. Remove `@Disabled` from `QSolutionsSoapAdapterTest.send_liveQSolutionsIntegration_returnsProcessedTrue`
-3. Run with Spring context wired to the real `ReceiveGPSInfoSoap` bean
-4. Assert `protocolo.isProcessed() == true`
-5. Copy full response: `receptionDate`, `message`, `processed` → paste in GitHub release notes for `v0.4.0`
-6. Re-add `@Disabled` before committing
+**Evidence:** `POST /api/units/Peugeot/pulse/force` → `204 No Content`
+**Log:** `PULSE_SENT numUnidad=Peugeot tracking=test-tracking receptionDate=2026-06-23T17:01:45.703765300-06:00[America/Mexico_City]`
+**Confirmed:** `Protocolo.isProcessed() == true` against live QSolutions endpoint.
 
-**This gate is non-negotiable. Do not tag `v0.4.0` without auditable proof of live dispatch.**
+Tag `v0.4.0` and proceed to Phase 5.
 
 ---
 

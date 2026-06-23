@@ -59,10 +59,11 @@ public class SecurityConfig {
                         // Add IP restriction for known Traccar devices in Phase 6 (v1.1.0).
                         .requestMatchers(HttpMethod.GET,  "/api/gps/position").permitAll()
 
-                        // Unit schedule and pulse operations (USER + ADMIN)
+                        // Unit schedule and pulse operations (USER + ADMIN) — specific rules before broad PUT /**
                         .requestMatchers(HttpMethod.PUT,  "/api/units/*/schedule").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
                         .requestMatchers(HttpMethod.POST, "/api/units/*/pulse/force").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
                         .requestMatchers(HttpMethod.GET,  "/api/units/*/pulse/test").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
+                        .requestMatchers(HttpMethod.POST, "/api/units/*/pulse/test-manual").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
 
                         // Logout requires valid token (any authenticated role)
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
@@ -73,8 +74,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT,  "/api/users/**").hasAuthority(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/users/**").hasAuthority(ROLE_ADMIN)
 
-                        // Units (ADMIN-only for CRUD; GET allows both)
+                        // Units — GET (ADMIN + USER); PUT sub-resources before broad PUT /**
                         .requestMatchers(HttpMethod.GET,  "/api/units").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
+                        .requestMatchers(HttpMethod.GET,  "/api/units/*").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
+                        .requestMatchers(HttpMethod.PUT,  "/api/units/*/activate").hasAuthority(ROLE_ADMIN)
+                        .requestMatchers(HttpMethod.PUT,  "/api/units/*/deactivate").hasAuthority(ROLE_ADMIN)
+                        .requestMatchers(HttpMethod.POST, "/api/units/*/round/start").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
+                        .requestMatchers(HttpMethod.POST, "/api/units/*/round/stop").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
                         .requestMatchers(HttpMethod.POST, "/api/units").hasAuthority(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.PUT,  "/api/units/**").hasAuthority(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/units/**").hasAuthority(ROLE_ADMIN)
