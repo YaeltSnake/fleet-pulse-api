@@ -5,6 +5,7 @@ import com.fleetpulse.api.infrastructure.adapter.out.persistence.entity.UserEnti
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -12,6 +13,7 @@ interface UserJpaRepository extends JpaRepository<UserEntity, Long> {
     Optional<UserEntity> findByUsername(String username);
     boolean existsByUsername(String username);
 
+    @Transactional
     @Modifying(clearAutomatically = true)
     @Query("UPDATE UserEntity u SET u.active = false WHERE u.id = :id")
     void deactivateById(Long id);

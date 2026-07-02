@@ -2551,21 +2551,884 @@ Tag `v0.4.0` and proceed to Phase 5.
 
 ## Phase 5 — Production Replacement Milestone 🏁
 **Tag:** `v1.0.0`
-**Exit condition:** All 5 fleet units receive confirmed pulses on the 15-minute automated cycle in production. Skip conditions fire and log correctly. JavaFX desktop app shut down. fleet-pulse-api is the sole GPS dispatcher.
+**Exit condition:** (1) Token lifecycle verified: login → refresh single-use → logout → access token blacklisted. (2) Authorization matrix enforced: USER blocked from ADMIN endpoints, missing token returns 401 not 403. (3) Schedule configured for all 5 units via API, `horarioFijo` guard confirmed. (4) Out-of-window behavior confirmed: round does NOT dispatch outside schedule window. (5) Force pulse with `Protocolo.isProcessed() == true` confirmed for all 5 units against live QSolutions. (6) Round scheduling cycled automatically 3+ times per unit, `roundActive` computed correctly. (7) Security headers present on responses. (8) 60-minute observation period passed with no `ERROR` or unexpected `WARN` in logs. (9) JavaFX desktop app shut down permanently. `fleet-pulse-api` is the sole GPS dispatcher.
 
-> Phase 4 delivers the full dispatch engine (adapters, orchestration service, scheduler, force-dispatch endpoint). Phase 5 is the production smoke test and the irreversible handover.
+> Phase 5 writes zero new code. It is a structured operational smoke test that simulates real operator workflows via Postman, validates every critical path of the Phase 4 dispatch engine against live infrastructure, and hands over from the JavaFX desktop app to this API.
+>
+> **No code to generate. No commits to make. All tasks are Postman requests + log observation.**
+>
+> ⚠️ **IRREVERSIBLE MILESTONE.** Step 11 (JavaFX shutdown) is the point of no return. Do not reach it until Steps 0–10 are fully verified.
+
+---
+
+### Environment Prerequisites
+
+Before starting Step 0, verify these are in place:
+
+| Prerequisite | How to verify |
+|---|---|
+| `.env` file present in project root | File exists at `C:\Dev\projects\fleet-pulse-api\fleetpulseapi\.env` |
+| `INITIAL_ADMIN_PASSWORD` set in `.env` | `grep INITIAL_ADMIN_PASSWORD .env` — value must not be blank |
+| `JWT_SECRET` set in `.env` (≥ 32 chars base64) | `grep JWT_SECRET .env` |
+| `QSOLUTIONS_USERNAME`, `QSOLUTIONS_PASSWORD` set in `.env` | `grep QSOLUTIONS .env` |
+| All 5 GPS coordinate entries present in `.env` | `grep GPS_ .env` — should show 10 lines (lat/lon × 5 units) |
+| Docker Desktop running | Task bar icon visible |
+| Postman installed | Open Postman, confirm version ≥ 10.x |
+
+---
+
+### Step 0 — Startup and Baseline Health
+
+> **Must be done first.** All subsequent steps require the application to be running and connected to DB + Redis.
+
+#### 0.1 — Start infrastructure containers
+
+```powershell
+docker-compose up -d
+```
+
+Expected: both containers (`fleet-pulse-mysql`, `fleet-pulse-redis`) status `Up`.
+
+Verify:
+```powershell
+docker-compose ps
+```
+
+#### 0.2 — Start Spring Boot application
+
+```powershell
+.\mvnw spring-boot:run
+```
+
+Expected console output (within 30 seconds of startup):
+
+| Log line | What it confirms |
+|---|---|
+| `Started FleetPulseApiApplication` | Context loaded without errors |
+| `ADMIN_SEEDED` or `ADMIN_ALREADY_EXISTS` | `AdminUserInitializer` ran successfully |
+| No `Could not resolve placeholder` | All `.env` bindings resolved |
+| No `WARN` or `ERROR` lines during startup | No configuration problems |
+
+> If `Could not resolve placeholder` appears → check `.env` variables. If `CONNECTION_REFUSED` for MySQL/Redis → check `docker-compose ps`.
+
+#### 0.3 — Confirm OpenAPI docs accessible
+
+```
+GET http://localhost:8080/v3/api-docs
+```
+
+Expected: `200 OK` with JSON body containing endpoint definitions.
+
+> This is a public internal endpoint (not in SecurityConfig auth matrix → will return 404 if `anyRequest().denyAll()` is active and it's not mapped). If 404: docs access is blocked — acceptable, skip to 0.4.
+
+#### 0.4 — Confirm DB data seeded
+
+```
+GET http://localhost:8080/api/units
+Authorization: (no header — should return 401)
+```
+
+Expected: `401` (not 403, not 500) — confirms the application is reachable and Spring Security is running.
 
 | Status | Task |
 |---|---|
-| ⬜ | Verify all 5 fleet units are configured in `gps.manual.units.*` with valid real coordinates |
-| ⬜ | Confirm `GET /api/units` returns all 5 units with `active=true` and correct schedule windows |
-| ⬜ | Use `GET /api/units/{numUnidad}/pulse/test` to verify `ManualCoordinateAdapter` returns coordinates for each unit before enabling the global scheduler |
-| ⬜ | Deploy Phase 4 build to production environment |
-| ⬜ | Use `POST /api/units/{numUnidad}/pulse/force` with body `{"coordinateMode":"MANUAL","lat":<real>,"lon":<real>}` to confirm each of the 5 units dispatches with real coordinates before trusting the scheduler |
-| ⬜ | Monitor first 3 automated scheduler ticks — confirm `PULSE_SENT` logged for all configured units |
-| ⬜ | Trigger at least one `SKIPPED_OUT_OF_WINDOW` event — confirm log fires correctly |
-| ⬜ | Confirm `Protocolo.isProcessed() == true` for all 5 units in production logs |
-| ⬜ | **MILESTONE: Shut down JavaFX desktop app. fleet-pulse-api is the sole dispatcher.** |
+| ✅ | `docker-compose up -d` — both containers Up |
+| ✅ | `.\mvnw spring-boot:run` — context starts without errors |
+| ✅ | `ADMIN_SEEDED` or `ADMIN_ALREADY_EXISTS` in startup logs |
+| ✅ | `GET /api/units` (no auth) → 401 |
+
+**Exit condition:** Application running, DB connected, Redis connected, admin user exists, unauthenticated request returns 401.
+
+---
+
+### Step 1 — Authentication and Full Token Lifecycle
+
+> Tests the complete JWT lifecycle: login, refresh single-use enforcement, logout, and blacklist verification. This step covers FIXME-SEC claims from `04-jwt-hardening.md`. If any sub-step fails, do not proceed.
+
+#### 1.1 — Login (obtain tokens)
+
+```
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "<INITIAL_ADMIN_PASSWORD from .env>"
+}
+```
+
+Expected: `200 OK`
+
+```json
+{
+  "accessToken": "<accessToken_1>",
+  "refreshToken": "<refreshToken_1>",
+  "expiresAt": "<ISO-8601 timestamp 15 minutes from now>"
+}
+```
+
+Save as Postman variables: `{{accessToken_1}}`, `{{refreshToken_1}}`.
+
+#### 1.2 — Refresh (token rotation)
+
+```
+POST http://localhost:8080/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken_1}}"
+}
+```
+
+Expected: `200 OK` with new pair `accessToken_2`, `refreshToken_2`.
+
+Save: `{{accessToken_2}}`, `{{refreshToken_2}}`.
+
+#### 1.3 — Refresh single-use enforcement ⚠️ SECURITY CRITICAL
+
+```
+POST http://localhost:8080/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken_1}}"   ← same token, already rotated
+}
+```
+
+Expected: `401 Unauthorized`
+
+```json
+{
+  "type": ".../errors/token-revoked",
+  "status": 401
+}
+```
+
+> If this returns `200`, the refresh token is NOT single-use. This is a security regression — `AuthService.refresh()` is not marking the old token `revoked=true`. Do not proceed until fixed.
+
+#### 1.4 — Logout
+
+```
+POST http://localhost:8080/api/auth/logout
+Authorization: Bearer {{accessToken_2}}
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken_2}}"
+}
+```
+
+Expected: `204 No Content`
+
+Confirms: access token blacklisted in Redis, refresh token marked `revoked=true` in DB.
+
+#### 1.5 — Blacklist verification ⚠️ SECURITY CRITICAL
+
+```
+GET http://localhost:8080/api/units
+Authorization: Bearer {{accessToken_2}}   ← blacklisted after logout
+```
+
+Expected: `401 Unauthorized`
+
+> If this returns `200`, the Redis blacklist is not working. `JwtAuthenticationFilter.isBlacklisted()` must return true for blacklisted tokens. Do not proceed until fixed.
+
+**Re-login to get fresh tokens for the rest of the test:**
+
+```
+POST http://localhost:8080/api/auth/login
+Body: { "username": "admin", "password": "<password>" }
+```
+
+Save as `{{adminToken}}`.
+
+| Status | Task |
+|---|---|
+| ✅ | 1.1 Login → `200 OK`, `accessToken` and `refreshToken` present |
+| ✅ | 1.2 Refresh → `200 OK`, new token pair returned |
+| ✅ | 1.3 Refresh with already-used token → `401` with `/errors/token-revoked` |
+| ✅ | 1.4 Logout → `204 No Content` |
+| ✅ | 1.5 Blacklisted access token rejected → `401` |
+| ✅ | Re-login → save `{{adminToken}}` for remaining steps |
+
+**Exit condition:** All 5 sub-steps verified. Token rotation and blacklist working. `{{adminToken}}` saved.
+
+---
+
+### Step 2 — Authorization Matrix (Negative Path Testing)
+
+> Verifies that the security configuration correctly blocks unauthorized access. These are the tests that catch misconfigurations before production.
+
+#### 2.1 — No token on protected endpoint
+
+```
+GET http://localhost:8080/api/units
+(no Authorization header)
+```
+
+Expected: `401` (NOT `403` — RFC 7235: missing auth = 401, insufficient auth = 403).
+
+#### 2.2 — Malformed token
+
+```
+GET http://localhost:8080/api/units
+Authorization: Bearer this-is-not-a-jwt
+```
+
+Expected: `401`
+
+#### 2.3 — Create USER-role account (for subsequent tests)
+
+```
+POST http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "username": "operador1",
+  "password": "Test1234!",
+  "role": "USER"
+}
+```
+
+Expected: `201 Created` with `Location: /api/users/{id}`
+
+Login with the new user:
+```
+POST http://localhost:8080/api/auth/login
+Body: { "username": "operador1", "password": "Test1234!" }
+```
+
+Save as `{{userToken}}`.
+
+#### 2.4 — USER blocked from ADMIN-only endpoint
+
+```
+GET http://localhost:8080/api/users
+Authorization: Bearer {{userToken}}
+```
+
+Expected: `403 Forbidden` with `Content-Type: application/problem+json` and `"type": ".../errors/forbidden"`.
+
+#### 2.5 — USER blocked from changing `horarioFijo=true` schedule
+
+Peugeot has `horarioFijo=true`. USER cannot change fixed schedules.
+
+```
+PUT http://localhost:8080/api/units/Peugeot/schedule
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "horarioFijo": true,
+  "horaInicio": "06:00",
+  "horaFin": "16:00"
+}
+```
+
+Expected: `403 Forbidden`
+
+> This rule is enforced in `UnitController.updateSchedule()`: if `horarioFijo == true` and caller is not ADMIN → throw `AccessDeniedException`. If this returns `200`, the controller-level guard is broken.
+
+#### 2.6 — Invalid request body (Jakarta Validation)
+
+```
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "",
+  "password": "x"
+}
+```
+
+Expected: `400 Bad Request` with `Content-Type: application/problem+json` and `$.errors.username` field present.
+
+#### 2.7 — Duplicate username (business rule)
+
+```
+POST http://localhost:8080/api/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "username": "operador1",
+  "password": "otherpass",
+  "role": "USER"
+}
+```
+
+Expected: `409 Conflict` with `"type": ".../errors/username-exists"`.
+
+| Status | Task |
+|---|---|
+| ✅ | 2.1 No token → `401` (not `403`) |
+| ✅ | 2.2 Malformed token → `401` |
+| ✅ | 2.3 Create `operador1` (USER role) → `201 Created` |
+| ✅ | 2.3 Login as `operador1` → save `{{userToken}}` |
+| ✅ | 2.4 USER hits `GET /api/users` → `403` + `application/problem+json` |
+| ✅ | 2.5 USER tries to change `horarioFijo=true` schedule → `403` |
+| ✅ | 2.6 Blank username → `400` + `$.errors.username` present |
+| ✅ | 2.7 Duplicate username → `409` + `/errors/username-exists` |
+
+**Exit condition:** All 7 cases return the expected status code with `application/problem+json` body on errors.
+
+---
+
+### Step 3 — Schedule Configuration for All 5 Units
+
+> Sets working schedules on all 5 units via the API, simulating the operator workflow. Schedules must cover the current time of day for dispatch tests to work.
+>
+> **Before sending:** check the current local time (America/Mexico_City). `horaInicio` and `horaFin` must bracket the current time.
+
+#### 3.1 — Update schedules (all units must use `{{adminToken}}`)
+
+| Unit | horarioFijo | horaInicio | horaFin | Notes |
+|---|---|---|---|---|
+| Peugeot | `true` | `06:00` | `22:00` | Fixed — ADMIN only |
+| Kangoo | `true` | `06:00` | `22:00` | Fixed — ADMIN only |
+| Tr-02 | `true` | `06:00` | `22:00` | Fixed — ADMIN only |
+| Attitude | `false` | `06:00` | `22:00` | Flexible — ADMIN or USER |
+| Sentra | `false` | `06:00` | `22:00` | Flexible — ADMIN or USER |
+
+For each unit:
+```
+PUT http://localhost:8080/api/units/{numUnidad}/schedule
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "horarioFijo": <true|false>,
+  "horaInicio": "06:00",
+  "horaFin": "22:00"
+}
+```
+
+Expected per unit: `200 OK` with `UnitResponse` body containing updated `horaInicio`, `horaFin`, and `horarioFijo`.
+
+#### 3.2 — Confirm all 5 units via GET
+
+```
+GET http://localhost:8080/api/units
+Authorization: Bearer {{adminToken}}
+```
+
+Expected: `200 OK`, list of 5 units. Each unit must have:
+- `active: true`
+- `horaInicio: "06:00"`
+- `horaFin: "22:00"`
+- `roundActive: false` (no rounds started yet)
+
+| Status | Task |
+|---|---|
+| ✅ | 3.1 `PUT /schedule` for Peugeot (horarioFijo=true) → `200 OK` |
+| ✅ | 3.1 `PUT /schedule` for Kangoo (horarioFijo=true) → `200 OK` |
+| ✅ | 3.1 `PUT /schedule` for Tr-02 (horarioFijo=true) → `200 OK` |
+| ✅ | 3.1 `PUT /schedule` for Attitude (horarioFijo=false) → `200 OK` |
+| ✅ | 3.1 `PUT /schedule` for Sentra (horarioFijo=false) → `200 OK` |
+| ✅ | 3.2 `GET /api/units` → all 5 with correct schedules, `active=true`, `roundActive=false` |
+
+**Exit condition:** `GET /api/units` returns 5 units with `horaInicio=06:00`, `horaFin=22:00`, `active=true`, `roundActive=false`.
+
+---
+
+### Step 4 — Out-of-Window Behavior Verification
+
+> Confirms that `RoundManagementService.processTick()` respects `isWithinActiveWindow()` and does NOT dispatch when the unit is outside its configured schedule. This test uses Attitude (`horarioFijo=false`) because its schedule is flexible and can be temporarily set to a past window without affecting the fixed-schedule units.
+
+#### 4.1 — Set Attitude to an impossible past schedule
+
+```
+PUT http://localhost:8080/api/units/Attitude/schedule
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "horarioFijo": false,
+  "horaInicio": "00:01",
+  "horaFin": "00:02"
+}
+```
+
+Expected: `200 OK` — Attitude now has a schedule window that never matches the current time.
+
+#### 4.2 — Start round for Attitude
+
+```
+POST http://localhost:8080/api/units/Attitude/round/start
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "coordinateMode": "MANUAL",
+  "lat": 19.4326,
+  "lon": -99.1332
+}
+```
+
+Expected: `204 No Content` — round is now active for Attitude.
+
+#### 4.3 — Observe 2–3 ticks (≈ 60–90 seconds)
+
+Watch the Spring Boot console. With `scheduler.round.tick-ms=30000` (default), 3 ticks fire in 90 seconds.
+
+Expected in logs: **NO** `ROUND_PULSE_SENT numUnidad=Attitude`.
+
+The tick fires every 30s but `isWithinActiveWindow(LocalTime.now(clock))` returns false for `00:01–00:02` at any normal daytime hour → dispatch is skipped.
+
+#### 4.4 — Stop round and restore Attitude's schedule
+
+```
+POST http://localhost:8080/api/units/Attitude/round/stop
+Authorization: Bearer {{adminToken}}
+→ 204 No Content
+
+PUT http://localhost:8080/api/units/Attitude/schedule
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "horarioFijo": false,
+  "horaInicio": "06:00",
+  "horaFin": "22:00"
+}
+→ 200 OK
+```
+
+| Status | Task |
+|---|---|
+| ⬜ | 4.1 Set Attitude schedule to `00:01–00:02` → `200 OK` |
+| ⬜ | 4.2 Start Attitude round → `204 No Content` |
+| ⬜ | 4.3 Wait 90 seconds — confirm NO `ROUND_PULSE_SENT` for Attitude in logs |
+| ⬜ | 4.4 Stop Attitude round → `204 No Content` |
+| ⬜ | 4.4 Restore Attitude schedule to `06:00–22:00` → `200 OK` |
+
+**Exit condition:** Zero `ROUND_PULSE_SENT numUnidad=Attitude` events during the 90-second window. `isWithinActiveWindow()` correctly blocks dispatch outside schedule.
+
+---
+
+### Step 5 — Provider Dry-Run (Zero QSolutions Calls)
+
+> Tests the `TestProviderUseCase` path — reads coordinates from `ManualCoordinateAdapter` and returns a `ProviderTestResponse` without calling QSolutions. Safe to run at any time.
+
+#### 5.1 — Dry-run per unit
+
+```
+GET http://localhost:8080/api/units/{numUnidad}/pulse/test
+Authorization: Bearer {{adminToken}}
+```
+
+Run for each of the 5 units: Peugeot, Kangoo, Tr-02, Attitude, Sentra.
+
+Expected per unit: `200 OK` with body containing:
+- `numUnidad`: unit name
+- `lat` and `lon`: values from `.env` GPS coordinates (not `0.0, 0.0`)
+- `providerType`: `"MANUAL"`
+- `timestamp`: ISO-8601 with `America/Mexico_City` offset
+
+#### 5.2 — Manual override with invalid coordinate
+
+```
+POST http://localhost:8080/api/units/Peugeot/pulse/test-manual
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "lat": 91.0,
+  "lon": 0.0
+}
+```
+
+Expected: `400 Bad Request` with `"type": ".../errors/invalid-coordinates"` — confirms `GpsReading` constructor rejects out-of-range coordinates before any SOAP call.
+
+#### 5.3 — AUTOMATIC mode guard (FIXME-PHASE6 active)
+
+```
+POST http://localhost:8080/api/units/Peugeot/pulse/force
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "coordinateMode": "AUTOMATIC"
+}
+```
+
+Expected: `400 Bad Request` — `FIXME-PHASE6` guard in `PulseController` blocks AUTOMATIC mode until Phase 6.
+
+| Status | Task |
+|---|---|
+| ⬜ | 5.1 `GET /pulse/test` for Peugeot → `200 OK`, coords from `.env`, not `0.0` |
+| ⬜ | 5.1 `GET /pulse/test` for Kangoo → `200 OK` |
+| ⬜ | 5.1 `GET /pulse/test` for Tr-02 → `200 OK` |
+| ⬜ | 5.1 `GET /pulse/test` for Attitude → `200 OK` |
+| ⬜ | 5.1 `GET /pulse/test` for Sentra → `200 OK` |
+| ⬜ | 5.2 `POST /pulse/test-manual` with `lat=91.0` → `400` + `/errors/invalid-coordinates` |
+| ⬜ | 5.3 `POST /pulse/force` with `coordinateMode=AUTOMATIC` → `400` (PHASE6 guard active) |
+
+**Exit condition:** All 5 units return coordinates from `.env` (not null, not 0.0). Invalid coordinate rejected. AUTOMATIC guard active.
+
+---
+
+### Step 6 — Force Pulse (Live QSolutions, All 5 Units)
+
+> ⚠️ **LIVE EXTERNAL SERVICE.** Each request sends a real pulse to QSolutions production endpoint. There is no sandbox. Confirm Step 5 passed before proceeding.
+
+#### 6.1 — Force pulse per unit
+
+```
+POST http://localhost:8080/api/units/{numUnidad}/pulse/force
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "coordinateMode": "MANUAL",
+  "lat": 19.4326,
+  "lon": -99.1332
+}
+```
+
+Run for each of the 5 units.
+
+Expected per unit: `204 No Content`
+
+Expected in Spring Boot logs:
+```
+INFO  PULSE_SENT numUnidad=<unit> tracking=<trackingNumber> receptionDate=<timestamp>
+```
+
+Confirm `isProcessed=true` visible in full log line (DEBUG level if enabled, or visible in the `QSolutionsSoapAdapter` log output).
+
+#### 6.2 — Confirm all 5 pulses registered in QSolutions portal
+
+Log into the QSolutions portal and verify all 5 units show a recent GPS event timestamp matching the test dispatch time.
+
+| Status | Task |
+|---|---|
+| ⬜ | 6.1 `POST /pulse/force` for Peugeot → `204 No Content` + `PULSE_SENT` in logs |
+| ⬜ | 6.1 `POST /pulse/force` for Kangoo → `204 No Content` + `PULSE_SENT` in logs |
+| ⬜ | 6.1 `POST /pulse/force` for Tr-02 → `204 No Content` + `PULSE_SENT` in logs |
+| ⬜ | 6.1 `POST /pulse/force` for Attitude → `204 No Content` + `PULSE_SENT` in logs |
+| ⬜ | 6.1 `POST /pulse/force` for Sentra → `204 No Content` + `PULSE_SENT` in logs |
+| ⬜ | 6.2 All 5 units visible in QSolutions portal with recent timestamp |
+
+**Exit condition:** `PULSE_SENT` logged for all 5 units. `isProcessed=true` confirmed. QSolutions portal confirms receipt.
+
+---
+
+### Step 7 — Round Scheduling: Full Cycle Test
+
+> Tests the per-unit round scheduling mechanism: start, race guard, automatic dispatch cycle (3 repetitions), stop guard, and final cleanup.
+>
+> **Before starting:** temporarily reduce the round interval for testing. Edit `.env`:
+> ```
+> SCHEDULER_ROUND_INTERVAL_MS=120000
+> ```
+> Restart the application: `.\mvnw spring-boot:run`
+> This schedules dispatches every 2 minutes instead of 15 — enough to observe 3 cycles within ~8 minutes.
+
+#### 7.1 — Start rounds for all 5 units
+
+```
+POST http://localhost:8080/api/units/{numUnidad}/round/start
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "coordinateMode": "MANUAL",
+  "lat": 19.4326,
+  "lon": -99.1332
+}
+```
+
+Run for each of the 5 units. Expected: `204 No Content` per unit.
+
+#### 7.2 — Confirm `roundActive: true` on all units
+
+```
+GET http://localhost:8080/api/units
+Authorization: Bearer {{adminToken}}
+```
+
+Expected: all 5 units have `roundActive: true` and `currentCoordinateMode: "MANUAL"`.
+
+#### 7.3 — Race guard: double-start
+
+```
+POST http://localhost:8080/api/units/Peugeot/round/start
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "coordinateMode": "MANUAL",
+  "lat": 19.4326,
+  "lon": -99.1332
+}
+```
+
+Expected: `409 Conflict` — `putIfAbsent` in `RoundManagementService.startRound()` rejects a second concurrent start.
+
+#### 7.4 — Observe 3 dispatch cycles
+
+Wait approximately 7–8 minutes (3 cycles × 2 minutes + tick overhead).
+
+Expected in Spring Boot logs, repeated 3 times:
+```
+INFO  ROUND_PULSE_SENT numUnidad=Peugeot
+INFO  ROUND_PULSE_SENT numUnidad=Kangoo
+INFO  ROUND_PULSE_SENT numUnidad=Tr-02
+INFO  ROUND_PULSE_SENT numUnidad=Attitude
+INFO  ROUND_PULSE_SENT numUnidad=Sentra
+```
+
+Confirm `PULSE_SENT` (QSolutions confirmed) also appears for each dispatch. Total expected QSolutions calls: 5 units × 3 cycles = 15 real pulses.
+
+#### 7.5 — Stop one unit and verify
+
+```
+POST http://localhost:8080/api/units/Sentra/round/stop
+Authorization: Bearer {{adminToken}}
+→ 204 No Content
+
+GET http://localhost:8080/api/units/Sentra
+Authorization: Bearer {{adminToken}}
+→ 200 OK, body: { ..., "roundActive": false }
+```
+
+#### 7.6 — Stop guard: stop already-stopped unit
+
+```
+POST http://localhost:8080/api/units/Sentra/round/stop
+Authorization: Bearer {{adminToken}}
+```
+
+Expected: `409 Conflict` — round is not active for Sentra.
+
+#### 7.7 — Stop remaining 4 units
+
+```
+POST http://localhost:8080/api/units/Peugeot/round/stop  → 204
+POST http://localhost:8080/api/units/Kangoo/round/stop   → 204
+POST http://localhost:8080/api/units/Tr-02/round/stop    → 204
+POST http://localhost:8080/api/units/Attitude/round/stop → 204
+```
+
+#### 7.8 — Confirm all rounds stopped
+
+```
+GET http://localhost:8080/api/units
+Authorization: Bearer {{adminToken}}
+```
+
+Expected: all 5 units with `roundActive: false`.
+
+#### 7.9 — Restore production interval
+
+Stop the application. Edit `.env`:
+```
+SCHEDULER_ROUND_INTERVAL_MS=900000
+```
+
+Restart: `.\mvnw spring-boot:run`
+
+| Status | Task |
+|---|---|
+| ⬜ | Reduce `SCHEDULER_ROUND_INTERVAL_MS=120000` in `.env` + restart |
+| ⬜ | 7.1 Start rounds for all 5 units → `204 No Content` each |
+| ⬜ | 7.2 `GET /api/units` → all 5 with `roundActive: true` |
+| ⬜ | 7.3 Double-start Peugeot → `409 Conflict` |
+| ⬜ | 7.4 Observe 3 complete dispatch cycles in logs (`ROUND_PULSE_SENT` × 5 × 3 = 15 events) |
+| ⬜ | 7.4 Confirm `PULSE_SENT` (QSolutions confirmed) for each cycle |
+| ⬜ | 7.5 Stop Sentra → `204`, `GET /api/units/Sentra` → `roundActive: false` |
+| ⬜ | 7.6 Stop already-stopped Sentra → `409 Conflict` |
+| ⬜ | 7.7 Stop Peugeot, Kangoo, Tr-02, Attitude → `204 No Content` each |
+| ⬜ | 7.8 `GET /api/units` → all 5 with `roundActive: false` |
+| ⬜ | 7.9 Restore `SCHEDULER_ROUND_INTERVAL_MS=900000` + restart |
+
+**Exit condition:** 15 `ROUND_PULSE_SENT` events observed (5 units × 3 cycles). Race guard (409 on double-start) and stop guard (409 on already-stopped) both confirmed. All rounds stopped cleanly.
+
+---
+
+### Step 8 — Security Headers Verification
+
+> Spring Security adds security headers automatically. Verifying them confirms the `SecurityConfig` is working as expected in the running application.
+
+In Postman, after any successful request (e.g., `GET /api/units`), inspect the **Headers** tab of the response:
+
+| Header | Expected value | If missing |
+|---|---|---|
+| `X-Content-Type-Options` | `nosniff` | Spring Security misconfiguration |
+| `X-Frame-Options` | `DENY` | Clickjacking protection missing |
+| `Cache-Control` | `no-cache, no-store, max-age=0, must-revalidate` | Response caching possible |
+| `Pragma` | `no-cache` | Legacy cache header |
+| `Expires` | `0` | Legacy expiry header |
+| `Content-Type` on any error | `application/problem+json` | RFC 7807 not applied |
+
+Also verify that error responses include `Content-Type: application/problem+json` — test with Step 2.4 response headers.
+
+| Status | Task |
+|---|---|
+| ⬜ | `X-Content-Type-Options: nosniff` present |
+| ⬜ | `X-Frame-Options: DENY` present |
+| ⬜ | `Cache-Control: no-cache, no-store...` present |
+| ⬜ | Error responses have `Content-Type: application/problem+json` |
+
+**Exit condition:** All 4 headers confirmed. No missing headers.
+
+---
+
+### Step 9 — Go/No-Go Checklist
+
+> Mandatory gate before Step 10. All items must be ✅ before proceeding to the 60-minute observation period. If any item is ⬜ or ❌, return to the corresponding step and resolve before continuing.
+
+| # | Criterion | Expected | Status |
+|---|---|---|---|
+| 1 | Login produces valid tokens | `200 OK` with `accessToken` and `refreshToken` | ⬜ |
+| 2 | Refresh token is single-use | Second use → `401 /errors/token-revoked` | ⬜ |
+| 3 | Logout blacklists access token | Immediate reuse → `401` | ⬜ |
+| 4 | USER blocked from ADMIN endpoints | `403 application/problem+json` | ⬜ |
+| 5 | USER cannot change `horarioFijo=true` schedule | `403` from controller guard | ⬜ |
+| 6 | Invalid coordinates rejected | `400 /errors/invalid-coordinates` | ⬜ |
+| 7 | Force pulse confirmed live | `PULSE_SENT isProcessed=true` for all 5 units | ⬜ |
+| 8 | Round dispatched automatically 3+ times per cycle | 15 `ROUND_PULSE_SENT` events observed | ⬜ |
+| 9 | Double-start returns 409 | `409` on second `round/start` call | ⬜ |
+| 10 | Out-of-window blocks dispatch | Zero `ROUND_PULSE_SENT` during `00:01–00:02` window | ⬜ |
+| 11 | Security headers present | `X-Content-Type-Options`, `X-Frame-Options`, `Cache-Control` | ⬜ |
+| 12 | `SCHEDULER_ROUND_INTERVAL_MS` restored to `900000` | `.env` confirms value, app restarted | ⬜ |
+
+**If all 12 items are ✅ → proceed to Step 10.**
+**If any item is not ✅ → DO NOT proceed. Resolve the issue and re-verify.**
+
+---
+
+### Step 10 — 60-Minute Observation Period (Production Load)
+
+> The application runs unattended for 60 minutes with all 5 units in active rounds. This confirms long-running stability: no memory leaks, no thread deadlocks, no unexpected scheduler failures.
+
+#### 10.1 — Start production rounds
+
+Start all 5 units with production interval (`900000ms` = 15 min):
+
+```
+POST /api/units/Peugeot/round/start   → 204
+POST /api/units/Kangoo/round/start    → 204
+POST /api/units/Tr-02/round/start     → 204
+POST /api/units/Attitude/round/start  → 204
+POST /api/units/Sentra/round/start    → 204
+
+(all with body: { "coordinateMode": "MANUAL", "lat": 19.4326, "lon": -99.1332 })
+```
+
+#### 10.2 — Observation targets (60 minutes)
+
+| Minute | Expected event |
+|---|---|
+| ~15 | First `ROUND_PULSE_SENT` × 5 + `PULSE_SENT` × 5 in logs |
+| ~30 | Second cycle × 5 |
+| ~45 | Third cycle × 5 |
+| ~60 | Fourth cycle (optional — confirms scheduler did not stop) |
+
+Minimum required: 3 complete cycles (15 `ROUND_PULSE_SENT` events, 15 QSolutions-confirmed `PULSE_SENT` events).
+
+#### 10.3 — Negative signals (must NOT appear)
+
+| Signal | What it would mean |
+|---|---|
+| `ERROR` in logs | Unhandled exception — do not cutover |
+| `WARN SchedulerError` or similar | Scheduler thread died — do not cutover |
+| Spring context restart or OOM | Critical stability failure — stop immediately |
+| Any exception stack trace | Investigate before proceeding |
+
+#### 10.4 — Stop all rounds after observation
+
+```
+POST /api/units/Peugeot/round/stop  → 204
+POST /api/units/Kangoo/round/stop   → 204
+POST /api/units/Tr-02/round/stop    → 204
+POST /api/units/Attitude/round/stop → 204
+POST /api/units/Sentra/round/stop   → 204
+```
+
+| Status | Task |
+|---|---|
+| ⬜ | 10.1 Start all 5 rounds with production interval (15 min) |
+| ⬜ | 10.2 Observe 3 complete cycles — 15 `ROUND_PULSE_SENT` events, 15 `PULSE_SENT` events |
+| ⬜ | 10.3 Zero `ERROR` lines in logs during 60-minute window |
+| ⬜ | 10.3 Zero unexpected `WARN` lines in logs |
+| ⬜ | 10.4 Stop all 5 rounds after observation |
+
+**Exit condition:** 3+ complete dispatch cycles observed. Zero errors or unexpected warnings in logs during the observation window.
+
+---
+
+### Step 11 — MILESTONE: JavaFX Cutover and Release
+
+> ⚠️ **IRREVERSIBLE ACTION.** Only execute this step after Steps 0–10 are all ✅.
+
+#### 11.1 — Shut down JavaFX GPSWebServicesClient
+
+Close the `GPSWebServicesClient` JavaFX desktop application on the dispatcher machine. This application is no longer the GPS dispatcher.
+
+**Rollback procedure (if needed before this step):** Re-open JavaFX. Nothing is permanently deleted. fleet-pulse-api can be stopped at any time before this step without consequences.
+
+**After this step:** There is no automatic rollback. fleet-pulse-api is the sole dispatcher.
+
+#### 11.2 — Restart fleet-pulse-api in production mode
+
+Confirm the production `.env` values are correct (not the test `SCHEDULER_ROUND_INTERVAL_MS=120000` from Step 7).
+
+```powershell
+.\mvnw spring-boot:run
+```
+
+Confirm `ADMIN_SEEDED` or `ADMIN_ALREADY_EXISTS` in logs. Application healthy.
+
+#### 11.3 — Start rounds for all 5 units (production)
+
+```
+POST /api/units/Peugeot/round/start   → 204
+POST /api/units/Kangoo/round/start    → 204
+POST /api/units/Tr-02/round/start     → 204
+POST /api/units/Attitude/round/start  → 204
+POST /api/units/Sentra/round/start    → 204
+```
+
+#### 11.4 — Tag v1.0.0
+
+```powershell
+git tag -a v1.0.0 -m "Phase 5 complete: production replacement milestone. JavaFX shutdown. All 5 units dispatching on 15-min automated cycle."
+git push origin v1.0.0
+```
+
+#### 11.5 — Update CLAUDE.md and ROADMAP.md
+
+- `CLAUDE.md` → Phase 5 status: `COMPLETE ✅` · Tag: `v1.0.0` · Date: `<today>`
+- `ROADMAP.md` → All Step checkboxes → `✅`
+- Record JavaFX shutdown date in CLAUDE.md under completed work
+
+| Status | Task |
+|---|---|
+| ⬜ | Steps 0–10 all ✅ confirmed |
+| ⬜ | 11.1 JavaFX `GPSWebServicesClient` shut down permanently |
+| ⬜ | 11.2 fleet-pulse-api restarted in production mode |
+| ⬜ | 11.3 All 5 rounds started in production |
+| ⬜ | 11.4 Tag `v1.0.0` created and pushed |
+| ⬜ | 11.5 `CLAUDE.md` and `ROADMAP.md` updated to reflect Phase 5 COMPLETE |
+
+**Exit condition:** `v1.0.0` tagged. All 5 units dispatching on automated 15-minute cycle. JavaFX shut down. CLAUDE.md updated.
+
+---
+
+### Known Debt Introduced / Confirmed in Phase 5
+
+| ID | Location | Severity | Description | Resolution Phase |
+|---|---|---|---|---|
+| FIXME-PHASE6 | `PulseController.java` | MEDIUM | `coordinateMode=AUTOMATIC` blocked by guard — no Traccar integration yet | Phase 6 |
+| FIXME-Q8 | `AuthController.java` | MEDIUM | No rate limiting on `POST /api/auth/login` | Before Phase 5 goes public (add Bucket4j) |
+| FIXME-SEC | `SecurityConfig.java` | MEDIUM | `/api/gps/position` fully public — no IP whitelist (not yet implemented) | Phase 6 — before v1.1.0 |
+| FIXME-CORS | `SecurityConfig.java` | MEDIUM | `allowedOriginPatterns("*")` permissive | Before production deploy |
+| ADR-003 | `User.java`, `UserRepository.java` | LOW | `userId` is DB surrogate key in domain | Phase 6 |
+| FIXME-MULTI-SESSION | `AuthService.java` → `login()` | MEDIUM | Login does NOT revoke previous sessions. All prior refresh tokens for the same user remain `revoked=false` in DB. All prior access tokens remain valid until natural expiry (15 min). An operator who logs in from two devices has two fully independent valid sessions — neither invalidates the other. To resolve: on `login()`, call `refreshTokenRepository.revokeAllByUserId(userId)` before issuing new tokens. Related to FIXME-SEC-FAMILY (OAuth 2.0 BCP §4.14). | Phase 6 — before multi-device operators |
+| FIXME-TRANS-REQUIRED | `RefreshTokenJpaRepository`, `UserJpaRepository` | HIGH (was runtime bug) | `@Modifying @Query` methods (`revokeByToken`, `deleteAllExpired`, `deactivateById`) were missing `@Transactional`, causing `TransactionRequiredException: Executing an update/delete query` at runtime. **Fixed in Phase 5** by adding `@Transactional` at method level on each `@Modifying` method. Tests passed because `@DataJpaTest` provides an implicit transaction. Lesson: always add `@Transactional` to `@Modifying` repository methods — the `@DataJpaTest` context masks this gap. | **RESOLVED in Phase 5** ✅ |
 
 ---
 

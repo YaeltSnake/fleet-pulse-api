@@ -55,6 +55,11 @@ public class AuthService implements AuthUseCase {
             throw new InvalidCredentialsException("Invalid Credentials");
         }
 
+        // FIXME-MULTI-SESSION: Login does not revoke previous sessions.
+        // All prior refresh tokens for this userId remain revoked=false in DB.
+        // All prior access tokens remain valid until natural expiry (15 min).
+        // Fix: call refreshTokenRepository.revokeAllByUserId(user.getId()) here before issuing.
+        // See ROADMAP Phase 5 Known Debt / FIXME-SEC-FAMILY for full context.
         String accessToken = tokenService.generateAccessToken(user.getId(), user.getRole().name());
         TokenService.GeneratedRefreshToken generated = tokenService.generateRefreshToken(user.getId());
 

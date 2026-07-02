@@ -1,0 +1,252 @@
+# Idea: Sistema Multi-Agente Especializado para Desarrollo de Software
+# Contexto: Conversación 2026-06-24 — fleet-pulse-api / Claude Code
+
+================================================================================
+## CONTEXTO DE LA IDEA
+================================================================================
+
+Durante el desarrollo de una aplicación Java Spring Boot con arquitectura hexagonal
+(Ports & Adapters) he estado usando Claude Code con "skills" especializadas:
+archivos .md en .claude/skills/ que definen reglas de seguridad, arquitectura, JPA,
+JWT, testing y diseño de API. Claude las carga como contexto adicional antes de generar código.
+
+Descubrí que Claude Code puede spawnear subagentes especializados con el Agent tool.
+Quiero evolucionar el modelo actual (un solo Claude con skills) hacia un sistema de
+agentes con responsabilidades separadas que trabajen en conjunto, similar a un equipo
+de desarrollo real donde cada persona tiene su especialidad.
+
+================================================================================
+## PROPUESTA: 5 AGENTES ESPECIALIZADOS
+================================================================================
+
+AGENTE 1 — INVESTIGACIÓN
+  Función   : Buscar información en fuentes actualizadas y confiables antes de decidir
+  Skills    : Evaluación de fuentes (docs oficiales, RFC, NIST, OWASP, blogs de ingeniería)
+  Tools     : WebSearch, WebFetch, Read
+  Cuándo usar: Antes de implementar cualquier feature nuevo, antes de adoptar una librería,
+               cuando hay una pregunta técnica sin respuesta clara en el codebase
+  Output    : Resumen de hallazgos con referencias y recomendación concreta
+
+AGENTE 2 — CIBERSEGURIDAD
+  Función   : Auditoría de seguridad del código, endpoints y configuración
+  Skills    : OWASP ASVS 4.0.3, NIST SP 800-63B, JWT hardening, SQL injection,
+               CORS, rate limiting, mass assignment, IDOR, supply chain
+  Tools     : Grep, Read, Glob, WebSearch
+  Stack     : Java Spring Boot REST API, Spring Security, JWT (JJWT), SOAP (JAX-WS)
+  Cuándo usar: Antes de cada merge con cambios en auth/endpoints/acceso a datos,
+               antes de un release, como gate obligatorio antes de pasar a producción
+  Output    : Audit report con PASS/FAIL/CONDITIONAL y blocking items
+
+AGENTE 3 — ARQUITECTURA
+  Función   : Verificar que la arquitectura se mantiene limpia conforme el sistema crece
+  Skills    : Hexagonal Architecture, Clean Architecture (Uncle Bob), CQRS, Event Sourcing,
+               decisiones monolito vs microservicios, ArchUnit patterns
+  Tools     : Grep, Read, Glob, WebSearch
+  Cuándo usar: Cuando se agregan nuevas capas o módulos, cuando el sistema crece y hay
+               dudas de si seguir en monolito o dividir en microservicios, cuando hay
+               violaciones de arquitectura detectadas por ArchUnit
+  Output    : Análisis de la arquitectura actual, recomendación de evolución, decisión
+               documentada como ADR (Architecture Decision Record)
+
+AGENTE 4 — CÓDIGO
+  Función   : Implementación de features con reglas estrictas de calidad
+  Skills    : Java 21 (Records, Sealed Classes, Virtual Threads), Spring Boot 3.5,
+               JPA/Hibernate 6, testing (JUnit 5, Mockito, Testcontainers, AssertJ)
+  Tools     : Read, Edit, Write, Bash, Glob, Grep
+  Cuándo usar: Para implementar lo que los demás agentes ya planificaron y aprobaron.
+               NUNCA implementa sin tener el plan del Agente de Planeación
+               y la aprobación del Agente de Seguridad y Arquitectura.
+  Output    : Código listo con tests, sin violaciones de arquitectura
+
+AGENTE 5 — PLANEACIÓN
+  Función   : Crear roadmaps detallados por fases y capas antes de implementar
+  Skills    : Metodologías de desarrollo (iterativo por capas), estimación, gestión de
+               deuda técnica, definición de exit conditions por fase
+  Tools     : Read, Write, WebSearch
+  Cuándo usar: Al inicio de cada fase para crear el plan de implementación capa a capa.
+               El roadmap generado es el input del Agente de Código.
+  Output    : Roadmap con fases, capas, prerequisites, exit conditions y orden correcto
+
+================================================================================
+## FLUJO DE TRABAJO ENTRE AGENTES
+================================================================================
+
+  [Nueva Feature]
+       |
+       v
+  Agente 5 (Planeación) → Plan detallado por capas
+       |
+       v
+  Agente 3 (Arquitectura) → Valida que el plan respeta la arquitectura
+       |
+       v
+  Agente 2 (Seguridad) → Audita el diseño ANTES de escribir código
+       |
+       v
+  Agente 4 (Código) → Implementa siguiendo el plan aprobado
+       |
+       v
+  Agente 2 (Seguridad) → Segunda auditoría sobre el código generado
+       |
+       v
+  [Código listo para merge]
+
+  Agente 1 (Investigación) se usa transversalmente cuando cualquier otro agente
+  necesita información externa (nueva librería, mejor práctica, CVE, etc.)
+
+================================================================================
+## OBJETIVO FINAL
+================================================================================
+
+1. Crear definiciones de agente (.md) en .claude/agents/ para cada uno de los 5 agentes
+2. Documentar el flujo de orquestación con ejemplos concretos
+3. Publicar como template en GitHub para que otros desarrolladores puedan usarlo
+4. Hacer el template genérico para proyectos Java/Spring Boot en general,
+   con instrucciones de cómo adaptarlo a otros stacks
+
+================================================================================
+## PREGUNTAS PARA EXPLORAR EN UN NUEVO CHAT
+================================================================================
+
+1. ¿Cuál es el formato exacto para definir custom agents en Claude Code?
+   (.claude/agents/*.md — frontmatter, campos disponibles, tools, model)
+
+2. ¿Pueden los agentes comunicarse entre ellos directamente o solo
+   a través del Claude orquestador?
+
+3. ¿Cuáles son las limitaciones actuales del sistema de agentes de Claude Code
+   vs lo que quiero lograr?
+
+4. ¿Cómo deben estar estructuradas las skills (.claude/skills/) para que los
+   agentes las carguen automáticamente, o hay que incluirlas en el system prompt?
+
+5. ¿Qué información esencial de Anthropic necesito saber para crear y publicar
+   estos agentes como template open source en GitHub?
+
+6. ¿Cuál sería la estructura de carpetas óptima del repo de GitHub para que
+   sea fácil de adoptar por otros equipos de desarrollo?
+
+================================================================================
+## STACK DE REFERENCIA (proyecto actual donde nació la idea)
+================================================================================
+
+  Nombre     : fleet-pulse-api
+  Stack      : Spring Boot 3.5.14, Java 21, MySQL 8.0, Redis 7, JJWT 0.12.6,
+               JAX-WS Metro 4.0.2, MapStruct 1.5.5, ArchUnit 1.3.0, Testcontainers
+  Arquitectura: Hexagonal (Ports & Adapters) + Clean Architecture
+  Skills ya implementadas:
+    01-security-audit.md   — OWASP ASVS gate antes de código
+    02-hexagonal-rules.md  — 14 prohibiciones absolutas de arquitectura
+    03-java-production.md  — Java 21 estándares de producción
+    04-jwt-hardening.md    — Token lifecycle y filter chain
+    05-jpa-performance.md  — Patrones de JPA prohibidos y requeridos
+    06-testing-strategy.md — Pirámide de tests por capa
+    07-API-Design.md       — RFC 7807, OpenAPI, DTO
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+    CONTEXTO EXTRA:
+    ---
+    Tipos de agentes disponibles en Claude Code
+
+    ┌─────────────────┬───────────────────────────────────────────────────────────────────────────────────┬───────────────────────────┐
+    │      Tipo       │                                   Cuándo usarlo                                   │     Contexto inicial      │
+    ├─────────────────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────────┤
+    │ fork            │ El agente necesita TODO el historial de la conversación. Barato — comparte caché. │ Hereda TODO lo tuyo       │
+    ├─────────────────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────────┤
+    │ general-purpose │ Investigación compleja, tareas multi-paso, si no sabes cuál usar                  │ Zero — hay que briefearlo │
+    ├─────────────────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────────┤
+    │ Explore         │ Solo buscar código: archivos por patrón, grep de símbolos, "¿dónde está X?"       │ Zero                      │
+    ├─────────────────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────────┤
+    │ Plan            │ Diseñar estrategia de implementación, ADRs, trade-offs arquitectónicos            │ Zero                      │
+    ├─────────────────┼───────────────────────────────────────────────────────────────────────────────────┼───────────────────────────┤
+    │ claude          │ Cualquier cosa que no encaje en los anteriores                                    │ Zero                      │
+    └─────────────────┴───────────────────────────────────────────────────────────────────────────────────┴───────────────────────────┘
+
+    Regla clave: fork hereda contexto → prompt corto. Los demás empiezan en cero → hay que explicarles todo en el prompt.
+
+    Ejecución en paralelo: Si mandas múltiples Agent calls en el mismo mensaje, corren simultáneamente. Por ejemplo: uno investiga seguridad, otro investiga arquitectura → al mismo tiempo → resultados en ~30% del tiempo.
+
+    Lo que hay que ajustar:
+
+    Los agentes no se comunican directamente entre ellos. La orquestación siempre pasa por el Claude principal (yo). El flujo real es:
+
+    Tú → Claude principal
+            ↓ spawns
+       Agente Investigación  ←→  resultado → Claude principal
+       Agente Arquitectura   ←→  resultado → Claude principal
+            ↓ sintetiza
+       Agente Código         ←→  resultado → Claude principal
+            ↓ reporta
+    Tú ← Claude principal
+
+    No existe un bus de mensajes entre agentes. Es siempre hub-and-spoke con el Claude principal en el centro.
+
+    Agente que falta en tu lista:
+
+    Agente de Tests — separado del de código. El agente de código genera la implementación, el de tests genera la suite independientemente. Los test suites escritos por alguien que no escribió el código encuentran más bugs.
+
+    ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+    COMO CREAR AGENTES - CON SEPARACION DE RESPONSABILIDADES
+    Cómo crear un custom agent en Claude Code
+
+    Crea un archivo .md en .claude/agents/:
+
+    ---
+    name: security-auditor
+    description: Run security audit on Java REST API code changes. Use before any merge touching auth, endpoints, or data access.
+    model: sonnet
+    tools: [Glob, Grep, Read, WebSearch, WebFetch]
+    ---
+
+    Eres un auditor de seguridad especializado en Java Spring Boot.
+    Stack: Spring Security, JWT (JJWT), JPA, SOAP (JAX-WS).
+    Standard: OWASP ASVS 4.0.3 Level 2 + NIST SP 800-63B.
+
+    [contenido de la skill 01-security-audit aquí]
+
+    El campo description es crítico — Claude Code lo lee para decidir cuándo auto-sugerir el agente. Escríbelo como "cuándo usarlo", no "qué hace".
+
+    Tools disponibles: Glob, Grep, Read, Edit, Write, Bash, WebSearch, WebFetch, Agent (y más). Declaras solo los que el agente necesita — principio de mínimo privilegio.
+
+    Model override: Puedes usar haiku para agentes rápidos de búsqueda, opus para los de arquitectura/seguridad, sonnet para código. Optimiza costo.
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+La idea del GitHub repo — también es factible
+
+La estructura del repo sería exactamente lo que ya tienes, más la carpeta de agentes:
+
+.claude/
+  agents/
+    01-research.md
+    02-security-auditor.md
+    03-architecture-reviewer.md
+    04-code-implementer.md
+    05-planning.md
+    06-test-generator.md     ← el que agregaría
+  skills/
+    01-security-audit.md     ← ya escritas
+    02-hexagonal-rules.md
+    03-java-production.md
+    04-jwt-hardening.md
+    05-jpa-performance.md
+    06-testing-strategy.md
+    07-API-Design.md
+CLAUDE.md                    ← orquesta todo con @references
+
+---
+Info esencial de Anthropic para empezar
+
+1. Claude Code docs — claude.ai/code → docs → "Custom agents" y "Hooks"
+2. El modelo de contexto: Fresh agents = zero context, siempre briefea completo. Fork = comparte caché, barato para derivaciones del trabajo actual.
+3. Facturación: Cada agente consume tokens independientemente. Agentes paralelos cuestan lo mismo que secuenciales pero tardan menos.
+4. Tool restrictions: En agents de investigación, no incluir Edit ni Write — principio de mínimo privilegio.
+5. Output size: Los agentes devuelven un solo mensaje al final. Para reportes largos, hazlos escribir a un archivo temporal y leerlo después.
+
+---
+================================================================================
