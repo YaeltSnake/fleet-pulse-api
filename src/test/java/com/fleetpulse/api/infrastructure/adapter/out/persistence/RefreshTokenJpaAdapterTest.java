@@ -99,6 +99,31 @@ class RefreshTokenJpaAdapterTest {
     }
 
     @Test
+    void revokeAllByUserId_withMultipleTokensForUser_revokesAllNonRevoked() {
+        // Arrange: 2 active tokens for user 1, 1 active token for user 2
+        String token1 = uniqueToken();
+        String token2 = uniqueToken();
+        String token3 = uniqueToken();
+        adapter.save(new RefreshToken(token1, 1L, Instant.now().plusSeconds(604800), false));
+        adapter.save(new RefreshToken(token2, 1L, Instant.now().plusSeconds(604800), false));
+        adapter.save(new RefreshToken(token3, 2L, Instant.now().plusSeconds(604800), false));
+
+        // Act
+        adapter.revokeAllByUserId(1L);
+
+        // Assert: user 1's tokens revoked, user 2's untouched
+        assertThat(adapter.findByToken(token1).get().isRevoked()).isTrue();
+        assertThat(adapter.findByToken(token2).get().isRevoked()).isTrue();
+        assertThat(adapter.findByToken(token3).get().isRevoked()).isFalse();
+    }
+
+    @Test
+    void revokeAllByUserId_whenNoTokensForUser_doesNotThrow() {
+        // Act + Assert
+        assertThatNoException().isThrownBy(() -> adapter.revokeAllByUserId(999L));
+    }
+
+    @Test
     void deleteAllExpired_whenAllTokensValid_deletesNothing() {
         // Arrange
         String token1 = uniqueToken();

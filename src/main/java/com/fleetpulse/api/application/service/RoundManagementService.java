@@ -66,17 +66,13 @@ public class RoundManagementService implements ManageRoundUseCase {
             throw new RoundAlreadyActiveException(numUnidad);
         }
 
-        // FIXME-PHASE6: remove this guard when TraccarCoordinateAdapter is wired
-        if (coordinateMode == CoordinateMode.AUTOMATIC) {
-            throw new InvalidCoordinateException("AUTOMATIC mode not supported until Phase 6");
+        if (coordinateMode == CoordinateMode.MANUAL) {
+            if (manualLat == null || manualLon == null) {
+                throw new InvalidCoordinateException("MANUAL mode requires lat and lon");
+            }
+            // Validate coordinate range via domain constructor — throws InvalidCoordinateException if OOB or 0,0
+            new GpsReading(numUnidad, manualLat, manualLon, ZonedDateTime.now(clock), ProviderType.MANUAL);
         }
-
-        if (manualLat == null || manualLon == null) {
-            throw new InvalidCoordinateException("MANUAL mode requires lat and lon");
-        }
-
-        // Validate coordinate range via domain constructor — throws InvalidCoordinateException if OOB or 0,0
-        new GpsReading(numUnidad, manualLat, manualLon, ZonedDateTime.now(clock), ProviderType.MANUAL);
 
         LocalTime horaInicio = unit.getHoraInicio();
         LocalTime horaFin    = unit.getHoraFin();

@@ -1,6 +1,8 @@
 package com.fleetpulse.api.infrastructure.config;
 import com.fleetpulse.api.infrastructure.security.JwtAuthenticationFilter;
+import com.fleetpulse.api.infrastructure.security.LoginRateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -24,6 +26,9 @@ public class SecurityConfig {
 
     private static final String ROLE_USER = "USER";
     private static final String ROLE_ADMIN = "ADMIN";
+
+    @Value("${app.cors.allowed-origin}")
+    private String allowedOrigin;
     /**
      * Encoder de passwords. Spring Security lo usa internamente
      * cuando inyectamos AuthenticationManager o cuando comparamos
@@ -41,13 +46,12 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            LoginRateLimitFilter loginRateLimitFilter) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // FIXME-CORS: allowedOriginPatterns("*") is permissive for development.
-                // Replace with exact frontend origin before production deployment.
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
@@ -58,6 +62,7 @@ public class SecurityConfig {
                         // FIXME-SEC: /api/gps/position is fully public — no IP whitelist.
                         // Add IP restriction for known Traccar devices in Phase 6 (v1.1.0).
                         .requestMatchers(HttpMethod.GET,  "/api/gps/position").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/gps/position").permitAll()
 
                         // Unit schedule and pulse operations (USER + ADMIN) — specific rules before broad PUT /**
                         .requestMatchers(HttpMethod.PUT,  "/api/units/*/schedule").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
@@ -85,6 +90,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT,  "/api/units/**").hasAuthority(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/units/**").hasAuthority(ROLE_ADMIN)
 
+                        // Pulse log — readable by ADMIN and USER (dashboard)
+                        .requestMatchers(HttpMethod.GET, "/api/pulse-log").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
+
                         // Secure default
                         .anyRequest().denyAll()
                 )
@@ -93,24 +101,18 @@ public class SecurityConfig {
                                 .authenticationEntryPoint((request, response, authException) ->
                                         response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
                 )
-                .addFilterBefore(
-                        jwtAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class
-                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(loginRateLimitFilter, JwtAuthenticationFilter.class)
                 .build();
     }
-    /**
-     * Permissive CORS for development.
-     * PRODUCTION: Replace "*" with exact frontend origins.
-     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedOriginPatterns(List.of(allowedOrigin));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
-        configuration.setAllowCredentials(false); // "*" no permite true
+        configuration.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

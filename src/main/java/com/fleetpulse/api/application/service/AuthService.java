@@ -14,9 +14,8 @@ import java.util.Optional;
 public class AuthService implements AuthUseCase {
 
 
-    // FIXME-TIMING: Constant-time defense against user enumeration (ASVS V2.7.1).
-    // BCrypt cost factor MUST match production value ($2a$10$...).
-    // Validate actual cost factor in application-prod.properties before Phase 5 go-live.
+    // Constant-time defense against user enumeration (ASVS V2.7.1).
+    // Cost factor 10 matches BCryptPasswordEncoder default — confirmed in application-prod.properties.
     private static final String DUMMY_HASH =
             "$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqhmM6JGKpS4G3R1G2JH8YpfB0Bqy";
 
@@ -55,11 +54,8 @@ public class AuthService implements AuthUseCase {
             throw new InvalidCredentialsException("Invalid Credentials");
         }
 
-        // FIXME-MULTI-SESSION: Login does not revoke previous sessions.
-        // All prior refresh tokens for this userId remain revoked=false in DB.
-        // All prior access tokens remain valid until natural expiry (15 min).
-        // Fix: call refreshTokenRepository.revokeAllByUserId(user.getId()) here before issuing.
-        // See ROADMAP Phase 5 Known Debt / FIXME-SEC-FAMILY for full context.
+        refreshTokenRepository.revokeAllByUserId(user.getId());
+
         String accessToken = tokenService.generateAccessToken(user.getId(), user.getRole().name());
         TokenService.GeneratedRefreshToken generated = tokenService.generateRefreshToken(user.getId());
 
@@ -118,13 +114,6 @@ public class AuthService implements AuthUseCase {
     public void logout(String accessToken, String refreshToken) {
         RefreshToken storedToken = refreshTokenRepository.findByToken(refreshToken)
                 .orElseThrow(() -> new RefreshTokenNotFoundException("Refresh token not found"));
-
-        if (storedToken.getExpiresAt().isBefore(Instant.now())) {
-            // FIXME-LOGOUT-REFRESH: If refresh token is expired, access token is NOT blacklisted.
-            // User cannot perform clean logout — access token remains valid until natural expiry.
-            // Evaluate partial logout (blacklist access token regardless) before Phase 5.
-            throw new RefreshTokenExpiredException("Refresh token expired");
-        }
 
         Long accessTokenUserId = tokenService.extractUserId(accessToken);
 

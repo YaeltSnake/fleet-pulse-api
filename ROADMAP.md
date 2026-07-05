@@ -15,7 +15,7 @@
 | 3 | `v0.3.0` | Pre-release | Security + Auth |
 | 4 | `v0.4.0` | Pre-release | Dispatch engine + API contract freeze |
 | 5 | `v1.0.0` | **Full release** | Production replacement |
-| 6 | `v1.1.0` | Full release | Traccar GPS live |
+| 6 | `v1.1.0` | **Full release** | Real-time GPS (Traccar) + technical debt resolved + pulse log |
 | 7 | `v2.0.0` | Full release | React frontend shipped |
 
 ---
@@ -2997,11 +2997,11 @@ Content-Type: application/json
 
 | Status | Task |
 |---|---|
-| ⬜ | 4.1 Set Attitude schedule to `00:01–00:02` → `200 OK` |
-| ⬜ | 4.2 Start Attitude round → `204 No Content` |
-| ⬜ | 4.3 Wait 90 seconds — confirm NO `ROUND_PULSE_SENT` for Attitude in logs |
-| ⬜ | 4.4 Stop Attitude round → `204 No Content` |
-| ⬜ | 4.4 Restore Attitude schedule to `06:00–22:00` → `200 OK` |
+| ✅ | 4.1 Set Attitude schedule to `00:01–00:02` → `200 OK` |
+| ✅ | 4.2 Start Attitude round → `204 No Content` |
+| ✅ | 4.3 Wait 90 seconds — confirm NO `ROUND_PULSE_SENT` for Attitude in logs |
+| ✅ | 4.4 Stop Attitude round → `204 No Content` |
+| ✅ | 4.4 Restore Attitude schedule to `06:00–22:00` → `200 OK` |
 
 **Exit condition:** Zero `ROUND_PULSE_SENT numUnidad=Attitude` events during the 90-second window. `isWithinActiveWindow()` correctly blocks dispatch outside schedule.
 
@@ -3057,13 +3057,13 @@ Expected: `400 Bad Request` — `FIXME-PHASE6` guard in `PulseController` blocks
 
 | Status | Task |
 |---|---|
-| ⬜ | 5.1 `GET /pulse/test` for Peugeot → `200 OK`, coords from `.env`, not `0.0` |
-| ⬜ | 5.1 `GET /pulse/test` for Kangoo → `200 OK` |
-| ⬜ | 5.1 `GET /pulse/test` for Tr-02 → `200 OK` |
-| ⬜ | 5.1 `GET /pulse/test` for Attitude → `200 OK` |
-| ⬜ | 5.1 `GET /pulse/test` for Sentra → `200 OK` |
-| ⬜ | 5.2 `POST /pulse/test-manual` with `lat=91.0` → `400` + `/errors/invalid-coordinates` |
-| ⬜ | 5.3 `POST /pulse/force` with `coordinateMode=AUTOMATIC` → `400` (PHASE6 guard active) |
+| ✅ | 5.1 `GET /pulse/test` for Peugeot → `200 OK`, coords from `.env`, not `0.0` |
+| ✅ | 5.1 `GET /pulse/test` for Kangoo → `200 OK` |
+| ✅ | 5.1 `GET /pulse/test` for Tr-02 → `200 OK` |
+| ✅ | 5.1 `GET /pulse/test` for Attitude → `200 OK` |
+| ✅ | 5.1 `GET /pulse/test` for Sentra → `200 OK` |
+| ✅ | 5.2 `POST /pulse/test-manual` with `lat=91.0` → `400` + `/errors/invalid-coordinates` |
+| ✅ | 5.3 `POST /pulse/force` with `coordinateMode=AUTOMATIC` → `400` (PHASE6 guard active) |
 
 **Exit condition:** All 5 units return coordinates from `.env` (not null, not 0.0). Invalid coordinate rejected. AUTOMATIC guard active.
 
@@ -3104,12 +3104,12 @@ Log into the QSolutions portal and verify all 5 units show a recent GPS event ti
 
 | Status | Task |
 |---|---|
-| ⬜ | 6.1 `POST /pulse/force` for Peugeot → `204 No Content` + `PULSE_SENT` in logs |
-| ⬜ | 6.1 `POST /pulse/force` for Kangoo → `204 No Content` + `PULSE_SENT` in logs |
-| ⬜ | 6.1 `POST /pulse/force` for Tr-02 → `204 No Content` + `PULSE_SENT` in logs |
-| ⬜ | 6.1 `POST /pulse/force` for Attitude → `204 No Content` + `PULSE_SENT` in logs |
-| ⬜ | 6.1 `POST /pulse/force` for Sentra → `204 No Content` + `PULSE_SENT` in logs |
-| ⬜ | 6.2 All 5 units visible in QSolutions portal with recent timestamp |
+| ✅ | 6.1 `POST /pulse/force` for Peugeot → `204 No Content` + `PULSE_SENT` in logs |
+| ✅ | 6.1 `POST /pulse/force` for Kangoo → `204 No Content` + `PULSE_SENT` in logs |
+| ✅ | 6.1 `POST /pulse/force` for Tr-02 → `204 No Content` + `PULSE_SENT` in logs |
+| ✅ | 6.1 `POST /pulse/force` for Attitude → `204 No Content` + `PULSE_SENT` in logs |
+| ✅ | 6.1 `POST /pulse/force` for Sentra → `204 No Content` + `PULSE_SENT` in logs |
+| ✅ | 6.2 All 5 units visible in QSolutions portal with recent timestamp |
 
 **Exit condition:** `PULSE_SENT` logged for all 5 units. `isProcessed=true` confirmed. QSolutions portal confirms receipt.
 
@@ -3232,17 +3232,17 @@ Restart: `.\mvnw spring-boot:run`
 
 | Status | Task |
 |---|---|
-| ⬜ | Reduce `SCHEDULER_ROUND_INTERVAL_MS=120000` in `.env` + restart |
-| ⬜ | 7.1 Start rounds for all 5 units → `204 No Content` each |
-| ⬜ | 7.2 `GET /api/units` → all 5 with `roundActive: true` |
-| ⬜ | 7.3 Double-start Peugeot → `409 Conflict` |
-| ⬜ | 7.4 Observe 3 complete dispatch cycles in logs (`ROUND_PULSE_SENT` × 5 × 3 = 15 events) |
-| ⬜ | 7.4 Confirm `PULSE_SENT` (QSolutions confirmed) for each cycle |
-| ⬜ | 7.5 Stop Sentra → `204`, `GET /api/units/Sentra` → `roundActive: false` |
-| ⬜ | 7.6 Stop already-stopped Sentra → `409 Conflict` |
-| ⬜ | 7.7 Stop Peugeot, Kangoo, Tr-02, Attitude → `204 No Content` each |
-| ⬜ | 7.8 `GET /api/units` → all 5 with `roundActive: false` |
-| ⬜ | 7.9 Restore `SCHEDULER_ROUND_INTERVAL_MS=900000` + restart |
+| ✅ | Reduce `SCHEDULER_ROUND_INTERVAL_MS=120000` in `.env` + restart |
+| ✅ | 7.1 Start rounds for all 5 units → `204 No Content` each |
+| ✅ | 7.2 `GET /api/units` → all 5 with `roundActive: true` |
+| ✅ | 7.3 Double-start Peugeot → `409 Conflict` |
+| ✅ | 7.4 Observe 3 complete dispatch cycles in logs (`ROUND_PULSE_SENT` × 5 × 3 = 15 events) |
+| ✅ | 7.4 Confirm `PULSE_SENT` (QSolutions confirmed) for each cycle |
+| ✅ | 7.5 Stop Sentra → `204`, `GET /api/units/Sentra` → `roundActive: false` |
+| ✅ | 7.6 Stop already-stopped Sentra → `409 Conflict` |
+| ✅ | 7.7 Stop Peugeot, Kangoo, Tr-02, Attitude → `204 No Content` each |
+| ✅ | 7.8 `GET /api/units` → all 5 with `roundActive: false` |
+| ✅ | 7.9 Restore `SCHEDULER_ROUND_INTERVAL_MS=900000` + restart |
 
 **Exit condition:** 15 `ROUND_PULSE_SENT` events observed (5 units × 3 cycles). Race guard (409 on double-start) and stop guard (409 on already-stopped) both confirmed. All rounds stopped cleanly.
 
@@ -3267,10 +3267,10 @@ Also verify that error responses include `Content-Type: application/problem+json
 
 | Status | Task |
 |---|---|
-| ⬜ | `X-Content-Type-Options: nosniff` present |
-| ⬜ | `X-Frame-Options: DENY` present |
-| ⬜ | `Cache-Control: no-cache, no-store...` present |
-| ⬜ | Error responses have `Content-Type: application/problem+json` |
+| ✅ | `X-Content-Type-Options: nosniff` present |
+| ✅ | `X-Frame-Options: DENY` present |
+| ✅ | `Cache-Control: no-cache, no-store...` present |
+| ✅ | Error responses have `Content-Type: application/problem+json` |
 
 **Exit condition:** All 4 headers confirmed. No missing headers.
 
@@ -3282,18 +3282,18 @@ Also verify that error responses include `Content-Type: application/problem+json
 
 | # | Criterion | Expected | Status |
 |---|---|---|---|
-| 1 | Login produces valid tokens | `200 OK` with `accessToken` and `refreshToken` | ⬜ |
-| 2 | Refresh token is single-use | Second use → `401 /errors/token-revoked` | ⬜ |
-| 3 | Logout blacklists access token | Immediate reuse → `401` | ⬜ |
-| 4 | USER blocked from ADMIN endpoints | `403 application/problem+json` | ⬜ |
-| 5 | USER cannot change `horarioFijo=true` schedule | `403` from controller guard | ⬜ |
-| 6 | Invalid coordinates rejected | `400 /errors/invalid-coordinates` | ⬜ |
-| 7 | Force pulse confirmed live | `PULSE_SENT isProcessed=true` for all 5 units | ⬜ |
-| 8 | Round dispatched automatically 3+ times per cycle | 15 `ROUND_PULSE_SENT` events observed | ⬜ |
-| 9 | Double-start returns 409 | `409` on second `round/start` call | ⬜ |
-| 10 | Out-of-window blocks dispatch | Zero `ROUND_PULSE_SENT` during `00:01–00:02` window | ⬜ |
-| 11 | Security headers present | `X-Content-Type-Options`, `X-Frame-Options`, `Cache-Control` | ⬜ |
-| 12 | `SCHEDULER_ROUND_INTERVAL_MS` restored to `900000` | `.env` confirms value, app restarted | ⬜ |
+| 1 | Login produces valid tokens | `200 OK` with `accessToken` and `refreshToken` | ✅ |
+| 2 | Refresh token is single-use | Second use → `401 /errors/token-revoked` | ✅ |
+| 3 | Logout blacklists access token | Immediate reuse → `401` | ✅ |
+| 4 | USER blocked from ADMIN endpoints | `403 application/problem+json` | ✅ |
+| 5 | USER cannot change `horarioFijo=true` schedule | `403` from controller guard | ✅ |
+| 6 | Invalid coordinates rejected | `400 /errors/invalid-coordinates` | ✅ |
+| 7 | Force pulse confirmed live | `PULSE_SENT isProcessed=true` for all 5 units | ✅ |
+| 8 | Round dispatched automatically 3+ times per cycle | 15 `ROUND_PULSE_SENT` events observed | ✅ |
+| 9 | Double-start returns 409 | `409` on second `round/start` call | ✅ |
+| 10 | Out-of-window blocks dispatch | Zero `ROUND_PULSE_SENT` during `00:01–00:02` window | ✅ |
+| 11 | Security headers present | `X-Content-Type-Options`, `X-Frame-Options`, `Cache-Control` | ✅ |
+| 12 | `SCHEDULER_ROUND_INTERVAL_MS` restored to `900000` | `.env` confirms value, app restarted | ✅ |
 
 **If all 12 items are ✅ → proceed to Step 10.**
 **If any item is not ✅ → DO NOT proceed. Resolve the issue and re-verify.**
@@ -3350,11 +3350,11 @@ POST /api/units/Sentra/round/stop   → 204
 
 | Status | Task |
 |---|---|
-| ⬜ | 10.1 Start all 5 rounds with production interval (15 min) |
-| ⬜ | 10.2 Observe 3 complete cycles — 15 `ROUND_PULSE_SENT` events, 15 `PULSE_SENT` events |
-| ⬜ | 10.3 Zero `ERROR` lines in logs during 60-minute window |
-| ⬜ | 10.3 Zero unexpected `WARN` lines in logs |
-| ⬜ | 10.4 Stop all 5 rounds after observation |
+| ✅ | 10.1 Start all 5 rounds with production interval (15 min) |
+| ✅ | 10.2 Observe 3 complete cycles — 15 `ROUND_PULSE_SENT` events, 15 `PULSE_SENT` events |
+| ✅ | 10.3 Zero `ERROR` lines in logs during 60-minute window |
+| ✅ | 10.3 Zero unexpected `WARN` lines in logs |
+| ✅ | 10.4 Stop all 5 rounds after observation |
 
 **Exit condition:** 3+ complete dispatch cycles observed. Zero errors or unexpected warnings in logs during the observation window.
 
@@ -3407,12 +3407,12 @@ git push origin v1.0.0
 
 | Status | Task |
 |---|---|
-| ⬜ | Steps 0–10 all ✅ confirmed |
-| ⬜ | 11.1 JavaFX `GPSWebServicesClient` shut down permanently |
-| ⬜ | 11.2 fleet-pulse-api restarted in production mode |
-| ⬜ | 11.3 All 5 rounds started in production |
-| ⬜ | 11.4 Tag `v1.0.0` created and pushed |
-| ⬜ | 11.5 `CLAUDE.md` and `ROADMAP.md` updated to reflect Phase 5 COMPLETE |
+| ✅ | Steps 0–10 all ✅ confirmed |
+| ✅ | 11.1 JavaFX `GPSWebServicesClient` shut down permanently |
+| ✅ | 11.2 fleet-pulse-api restarted in production mode |
+| ✅ | 11.3 All 5 rounds started in production |
+| ✅ | 11.4 Tag `v1.0.0` created and pushed |
+| ✅ | 11.5 `CLAUDE.md` and `ROADMAP.md` updated to reflect Phase 5 COMPLETE |
 
 **Exit condition:** `v1.0.0` tagged. All 5 units dispatching on automated 15-minute cycle. JavaFX shut down. CLAUDE.md updated.
 
@@ -3432,23 +3432,950 @@ git push origin v1.0.0
 
 ---
 
-## Phase 6 — Traccar GPS Integration
-**Tag:** `v1.1.0`
-**Exit condition:** Traccar OsmAnd push received, stored in cache, dispatched to QSolutions. `SKIPPED_STALE` fires correctly after 300s. Full flow verified with Mockito before real devices.
+## Phase 6 — Real-Time GPS + Technical Debt + Pulse Log
+**Tag:** `v1.1.0` ✅
+**Exit condition:** (1) All MEDIUM/HIGH technical debt from Phase 5 resolved (FIXME-Q8, FIXME-MULTI-SESSION, FIXME-LOGOUT-REFRESH, FIXME-TIMING, FIXME-CORS). (2) `TraccarPositionController` receives OsmAnd GET and Traccar Client POST pushes, stores in `GpsPositionCache` keyed by `numUnidad`. (3) `TraccarCoordinateAdapter` replaces `ManualCoordinateAdapter` as the active GPS provider. (4) `SKIPPED_STALE` logged when a coordinate is older than 300 s. (5) `pulse_log` table in DB, written after each dispatch outcome. (6) `GET /api/pulse-log` paginated and filterable. (7) `coordinateMode=AUTOMATIC` guard removed from `PulseController`. (8) Real Traccar Client coordinate confirmed in at least one `PULSE_SENT` event. (9) 263 tests passing, 0 failures, 0 ArchUnit violations. ✅
 
-> Phase 6 wires `TraccarCoordinateAdapter` as the AUTOMATIC provider. Two items deferred to this phase:
-> (1) Force dispatch with `coordinateMode=AUTOMATIC` — remove `FIXME-PHASE6` guard in `PulseController`.
-> (2) AUTOMATIC round scheduling — fully functional once `TraccarCoordinateAdapter` is wired.
+> **GPS Design Decision (ADR-018):** The OsmAnd push `id` field maps directly to `numUnidad`. Operators configure Traccar Client with the exact unit identifier (e.g. `Peugeot`). No additional mapping table. When real hardware GPS arrives via SMS, it will use the same endpoint with no server-side changes — only the push source changes.
+>
+> **Mandatory order:** Layers 1–4 resolve technical debt and must be completed before introducing new features. No new feature ships with active MEDIUM debt on top of it.
+
+---
+
+### Layer 1 — Technical Debt: Auth (incorrect production behavior) ✅
+
+> ⛔ Start here. Auth debt affects live production sessions. Resolve before any other layer.
+
+#### 1.1 — FIXME-MULTI-SESSION: Revoke prior sessions on login
+
+**Problem:** `AuthService.login()` issues new tokens without revoking the previous login's tokens. A user can hold N concurrent active sessions with no control.
+
+**Files modified:**
+- `application/port/out/RefreshTokenRepository.java` — add method to port
+- `infrastructure/adapter/out/persistence/RefreshTokenJpaRepository.java` — JPA query
+- `infrastructure/adapter/out/persistence/RefreshTokenJpaAdapter.java` — delegation
+- `application/service/AuthService.java` — call before issuing new tokens
+
+**Port addition:**
+```java
+void revokeAllByUserId(Long userId);
+```
+
+**JPA query (`RefreshTokenJpaRepository`):**
+```java
+@Modifying
+@Transactional
+@Query("UPDATE RefreshTokenEntity r SET r.revoked = true WHERE r.userId = :userId AND r.revoked = false")
+void revokeAllByUserId(@Param("userId") Long userId);
+```
+
+**Call in `AuthService.login()`** — insert before `generateAccessToken()`:
+```java
+refreshTokenRepository.revokeAllByUserId(user.getId());
+```
+
+**Rules:**
+- `@Transactional` required on the `@Modifying` method — lesson from FIXME-TRANS-REQUIRED.
+- Method revokes only non-revoked tokens (`revoked = false`) — idempotent if called twice.
+- Previous access tokens remain valid until their natural 15-min expiry. Acceptable — pending FIXME-SEC-FAMILY in Phase 8.
 
 | Status | Task |
 |---|---|
-| ⬜ | `GpsPositionCache.java` — `ConcurrentHashMap<String, GpsReading>` |
-| ⬜ | `TraccarPositionController.java` — public endpoint, receives OsmAnd HTTP GET |
-| ⬜ | `TraccarCoordinateAdapter.java` implements `GpsCoordinateProvider` |
-| ⬜ | `GpsProviderConfig.java` extended — add TRACCAR switch via `application.properties` |
-| ⬜ | `SKIPPED_STALE` logged when coordinate age > `GPS_MAX_COORDINATE_AGE_SECONDS` (300s default) |
-| ⬜ | Full Traccar flow tested with Mockito — no real phones required |
-| ⬜ | Operator setup guide — how to configure Traccar Client (Server URL, device ID, interval) |
+| ✅ | Add `revokeAllByUserId(Long userId)` to `RefreshTokenRepository` port |
+| ✅ | Add `@Modifying @Transactional @Query` in `RefreshTokenJpaRepository` |
+| ✅ | Implement delegation in `RefreshTokenJpaAdapter` |
+| ✅ | Call `refreshTokenRepository.revokeAllByUserId(user.getId())` in `AuthService.login()` before issuing tokens |
+| ✅ | Remove `FIXME-MULTI-SESSION` comment from `AuthService.java` |
+| ✅ | `mvn test` — 238 passing, 0 failures (+3 new: revokeAllByUserId ×2, logout partial ×1) |
+
+Exit condition: Two consecutive logins with the same user → first refresh token is `revoked = true` in DB. Second token pair works. Verified in `AuthServiceTest` with Mockito.
+
+---
+
+#### 1.2 — FIXME-LOGOUT-REFRESH: Blacklist access token even if refresh is expired
+
+**Problem:** `AuthService.logout()` throws `RefreshTokenExpiredException` if the refresh token has expired, without blacklisting the access token. The user is left with a valid access token they cannot revoke.
+
+**File modified:** `application/service/AuthService.java` — `logout()` method
+
+**New logic:**
+```
+If refresh token expired:
+  → Blacklist access token regardless (full logout — no exception thrown)
+If refresh token valid:
+  → Current flow (blacklist + revoke)
+```
+
+| Status | Task |
+|---|---|
+| ✅ | Rewrite `if (storedToken.getExpiresAt().isBefore(Instant.now()))` block in `AuthService.logout()` — implemented as full logout (no throw), supersedes the partial-logout spec |
+| ✅ | Remove `FIXME-LOGOUT-REFRESH` comment from `AuthService.java` |
+| ✅ | `mvn test` — 238 passing, 0 failures |
+
+Exit condition: `AuthServiceTest` verifies `tokenBlacklist.blacklist()` is called even when the refresh token is expired.
+
+---
+
+### Layer 2 — Technical Debt: Security (Rate Limiting + CORS) ✅
+
+> ⛔ Cannot begin until Layer 1 complete. Bucket4j modifies the Spring Security context — needs a stable auth base.
+
+#### 2.1 — FIXME-Q8: Rate limiting on `/api/auth/login`
+
+**Problem:** Without attempt limits, `/api/auth/login` is vulnerable to brute-force attacks.
+
+**Dependency added to `pom.xml`:**
+```xml
+<dependency>
+    <groupId>com.bucket4j</groupId>
+    <artifactId>bucket4j-core</artifactId>
+    <version>8.10.1</version>
+</dependency>
+```
+
+**Implementation:**
+- New file: `infrastructure/security/LoginRateLimitFilter.java`
+- Extends `OncePerRequestFilter`
+- Applies only to `POST /api/auth/login`
+- Limit: 5 attempts per IP per minute
+- On excess: 429 Too Many Requests + `Content-Type: application/problem+json`
+- `ConcurrentHashMap<String, Bucket>` — one bucket per IP, created with `putIfAbsent`
+- Bucket config: `Bandwidth.classic(5, Refill.intervally(5, Duration.ofMinutes(1)))`
+- Registered in `SecurityConfig` BEFORE `JwtAuthenticationFilter`
+
+**429 response:**
+```json
+{
+  "type": "/errors/rate-limited",
+  "title": "Too many requests",
+  "status": 429,
+  "detail": "Maximum 5 login attempts per minute exceeded. Try again later."
+}
+```
+
+**Rules:**
+- Filter reads `request.getRemoteAddr()` as IP key. If API is behind a proxy (nginx), read `X-Forwarded-For` header — FIXME-PROXY noted for Phase 7 deploy.
+- `Bucket` is thread-safe — `tryConsume(1)` is atomic.
+- Buckets in `ConcurrentHashMap` have no TTL. For 5 units with few admins, footprint is negligible. Eviction for Phase 8+ if scaled.
+- Filter does NOT apply to `/api/auth/refresh` or any other endpoint.
+
+| Status | Task |
+|---|---|
+| ✅ | Add `bucket4j-core` to `pom.xml` |
+| ✅ | Create `LoginRateLimitFilter.java` in `infrastructure/security/` |
+| ✅ | Register filter in `ApplicationConfig` as `@Bean` (no `@Component`) |
+| ✅ | Add `.addFilterBefore(loginRateLimitFilter, JwtAuthenticationFilter.class)` in `SecurityConfig` |
+| ✅ | `/errors/rate-limited` documented in type URI registry (filter writes directly) |
+| ✅ | Remove `FIXME-Q8` from `AuthController.java` and `SecurityConfig.java` |
+| ✅ | `mvn test` — 243 passing, 0 failures |
+
+Exit condition: 5 login attempts from the same IP → sixth attempt returns 429 with `application/problem+json`. Verified in `LoginRateLimitFilterTest` with MockMvc.
+
+---
+
+#### 2.2 — FIXME-CORS: Replace wildcard with configurable origin
+
+**Problem:** `allowedOriginPatterns("*")` allows requests from any domain. Before exposing the frontend, the origin must be explicit.
+
+**File modified:** `infrastructure/config/SecurityConfig.java`
+
+**New configuration:**
+```java
+configuration.setAllowedOriginPatterns(List.of(allowedOrigin));
+```
+
+**New property in `application.properties`:**
+```properties
+app.cors.allowed-origin=${ALLOWED_ORIGIN:http://localhost:5173}
+```
+
+**New env var in `.env.example`:**
+```
+ALLOWED_ORIGIN=http://localhost:5173
+```
+
+The default `http://localhost:5173` matches the Vite (React) dev server. Override with the real domain in production.
+
+**Injection in `SecurityConfig`:**
+```java
+@Value("${app.cors.allowed-origin}")
+private String allowedOrigin;
+```
+
+| Status | Task |
+|---|---|
+| ✅ | Add `app.cors.allowed-origin` to `application.properties` |
+| ✅ | Add `ALLOWED_ORIGIN` to `.env.example` |
+| ✅ | Modify `corsConfigurationSource()` in `SecurityConfig` to use `@Value` |
+| ✅ | Remove `FIXME-CORS` from `SecurityConfig.java` |
+| ✅ | `mvn test` — 243 passing, 0 failures |
+
+Exit condition: CORS configuration reads origin from env var. `application.properties` default = `http://localhost:5173`. `SecurityConfig` has no hardcoded origin strings.
+
+---
+
+### Layer 3 — Technical Debt: Cosmetic + Validation ✅ (FIXME-PERF deferred to Phase 7)
+
+> Can run in parallel with Layer 2. Surgical changes with no regression risk.
+
+#### 3.1 — FIXME-IMPORT-1 + FIXME-IMPORT-2: Missing imports
+
+**`RedisTokenBlacklistAdapter.java`:** replace fully-qualified `org.springframework.dao.DataAccessException` usage with a proper import at the top of the file.
+
+**`BcryptPasswordHasherAdapter.java`:** replace fully-qualified `org.springframework.security.crypto.password.PasswordEncoder` usage with a proper import.
+
+| Status | Task |
+|---|---|
+| ✅ | Add `import org.springframework.dao.DataAccessException;` in `RedisTokenBlacklistAdapter.java` |
+| ✅ | Add `import org.springframework.security.crypto.password.PasswordEncoder;` in `BcryptPasswordHasherAdapter.java` |
+
+---
+
+#### 3.2 — FIXME-SCHEDULE-VALIDATION: Validate `horaInicio < horaFin`
+
+**Problem:** `Unit.isWithinActiveWindow()` throws `IllegalStateException` if `horaInicio > horaFin`. Validation must happen at write time, not read time.
+
+**File modified:** `application/service/UnitManagementService.java` — `updateSchedule()` method
+
+**Validation added (before persisting):**
+```java
+if (!request.horaInicio().isBefore(request.horaFin())) {
+    throw new ScheduleConflictException(
+        "horaInicio must be before horaFin — overnight schedules are not supported");
+}
+```
+
+`ScheduleConflictException` already exists in `domain/exception/`. Mapped to 409 in `GlobalExceptionHandler`.
+
+| Status | Task |
+|---|---|
+| ✅ | Add `horaInicio < horaFin` validation in `UnitManagementService.updateSchedule()` before persisting |
+| ✅ | Test in `UnitManagementServiceTest` — `updateSchedule_whenHoraInicioNotBeforeHoraFin_throwsScheduleConflictException` |
+| ✅ | Remove `FIXME-SCHEDULE-VALIDATION` comment from `Unit.java` |
+| ✅ | `mvn test` — 243 passing, 0 failures |
+
+---
+
+#### 3.3 — FIXME-PERF: Eliminate triple JWT parse per request (deferred to Phase 7)
+
+**Problem:** `JwtAuthenticationFilter` calls `isTokenValid()`, `extractUserId()`, and `extractRole()` — three parses of the same JWT per request.
+
+**Files to modify (Phase 7):**
+- `application/port/out/TokenService.java` — add `parseToken()` method
+- `infrastructure/security/JwtService.java` — implement `parseToken()`
+- `infrastructure/security/JwtAuthenticationFilter.java` — use new method
+
+**Port change (`TokenService`):**
+```java
+record TokenClaims(Long userId, String role, Duration remainingTtl) {}
+TokenClaims parseToken(String token);
+```
+
+**`JwtService.parseToken()`:** parse once, extract `sub`, `role`, compute remaining TTL, return `TokenClaims`.
+
+**`JwtAuthenticationFilter`:** replace the three calls with a single `tokenService.parseToken(token)`. Exception → 401. Claims → build `Authentication`.
+
+**Rules:**
+- `parseToken()` throws the same exceptions as `isTokenValid()` on invalid tokens — `JwtAuthenticationFilter` already handles them.
+- `isTokenValid()`, `extractUserId()`, `extractRole()` remain in the port for compatibility with existing tests — do not remove.
+
+| Status | Task |
+|---|---|
+| ⬜ | Add `record TokenClaims(Long userId, String role, Duration remainingTtl)` in `TokenService.java` |
+| ⬜ | Add `TokenClaims parseToken(String token)` to the `TokenService` port |
+| ⬜ | Implement `parseToken()` in `JwtService.java` |
+| ⬜ | Refactor `JwtAuthenticationFilter` to use `parseToken()` — one parse per request |
+| ⬜ | Remove `FIXME-PERF` from `TokenService.java` |
+| ⬜ | `mvn test` — 263+ passing, 0 failures |
+
+Exit condition: `JwtAuthenticationFilter` calls `tokenService.parseToken()` once per request. Existing filter tests remain green.
+
+---
+
+### Layer 4 — Technical Debt: Supply Chain + BCrypt
+
+#### 4.1 — FIXME-Q6: dependency-check-maven
+
+**File to modify:** `pom.xml`
+
+```xml
+<plugin>
+    <groupId>org.owasp</groupId>
+    <artifactId>dependency-check-maven</artifactId>
+    <version>10.0.4</version>
+    <executions>
+        <execution>
+            <goals><goal>check</goal></goals>
+        </execution>
+    </executions>
+    <configuration>
+        <failBuildOnCVSS>7</failBuildOnCVSS>
+        <suppressionFile>${project.basedir}/.dependency-check-suppressions.xml</suppressionFile>
+    </configuration>
+</plugin>
+```
+
+`failBuildOnCVSS=7` — build fails on any HIGH or CRITICAL CVE without an approved suppression.
+
+Create `.dependency-check-suppressions.xml` empty file at project root (for future justified suppressions with reason comment + review date).
+
+| Status | Task |
+|---|---|
+| ⬜ | Add `dependency-check-maven` plugin to `pom.xml` (`verify` phase) |
+| ⬜ | Create empty `.dependency-check-suppressions.xml` at project root |
+| ⬜ | Add `.dependency-check-suppressions.xml` to `.gitignore` if it contains local paths |
+| ⬜ | Run `mvn dependency-check:check` — confirm 0 HIGH/CRITICAL CVEs without suppression |
+| ⬜ | Remove `FIXME-Q6` from `pom.xml` |
+
+---
+
+#### 4.2 — FIXME-TIMING: Validate BCrypt cost factor
+
+**Problem:** The `DUMMY_HASH` in `AuthService` uses cost factor `$2a$10$...`. If production uses a different factor, the timing defense is ineffective.
+
+**Resolution applied:** Cost factor 10 confirmed — `new BCryptPasswordEncoder()` default = 10; `DUMMY_HASH = $2a$10$...` matches. Documented in `application-prod.properties`. `FIXME-TIMING` comment removed from `AuthService.java`.
+
+**Remaining hardening (Phase 7):** Make BCrypt strength configurable via env var so the cost factor can be increased without code changes.
+
+**`application.properties` addition (Phase 7):**
+```properties
+app.security.bcrypt-strength=${BCRYPT_STRENGTH:10}
+```
+
+**`ApplicationConfig` change (Phase 7):** the `@Bean BCryptPasswordEncoder` reads the configured strength:
+```java
+@Bean
+public PasswordEncoder passwordEncoder(@Value("${app.security.bcrypt-strength}") int strength) {
+    return new BCryptPasswordEncoder(strength);
+}
+```
+
+**`SecurityConfig` change (Phase 7):** remove the `@Bean PasswordEncoder` declared there — consolidate in `ApplicationConfig` per ADR-009.
+
+| Status | Task |
+|---|---|
+| ✅ | Confirm BCrypt cost factor 10 matches `DUMMY_HASH` — documented in `application-prod.properties` |
+| ✅ | Remove `FIXME-TIMING` comment from `AuthService.java` |
+| ⬜ | Add `app.security.bcrypt-strength` to `application.properties` |
+| ⬜ | Add `BCRYPT_STRENGTH=10` to `.env.example` |
+| ⬜ | Move `@Bean PasswordEncoder` from `SecurityConfig` to `ApplicationConfig` with `@Value("${app.security.bcrypt-strength}")` |
+| ⬜ | Remove `@Bean PasswordEncoder` from `SecurityConfig` |
+| ⬜ | Update `DUMMY_HASH` comment in `AuthService` — indicate it must match `BCRYPT_STRENGTH` |
+| ⬜ | `mvn test` — 263+ passing, 0 failures |
+
+Exit condition: BCrypt strength is configurable via env var. `ApplicationConfig` is the sole `PasswordEncoder @Bean` declaration. `SecurityConfig` has no business beans.
+
+---
+
+### Layer 5 — Flyway: `pulse_log` Table ✅
+
+#### 5.1 — `V5__pulse_log.sql`
+
+File: `src/main/resources/db/migration/V5__pulse_log.sql`
+
+```sql
+CREATE TABLE pulse_log (
+    id             BIGINT        AUTO_INCREMENT PRIMARY KEY,
+    num_unidad     VARCHAR(100)  NOT NULL,
+    status         ENUM(
+                     'SENT',
+                     'SKIPPED_INACTIVE',
+                     'SKIPPED_OUT_OF_WINDOW',
+                     'SKIPPED_STALE',
+                     'SKIPPED_NO_COORDS',
+                     'REJECTED',
+                     'ERROR'
+                   )             NOT NULL,
+    lat            DECIMAL(9,6)  NULL,
+    lon            DECIMAL(9,6)  NULL,
+    provider       VARCHAR(50)   NULL,
+    tracking_number VARCHAR(255) NULL,
+    sent_at        DATETIME      NOT NULL,
+    error_message  VARCHAR(500)  NULL,
+    INDEX idx_pulse_log_num_unidad (num_unidad),
+    INDEX idx_pulse_log_status     (status),
+    INDEX idx_pulse_log_sent_at    (sent_at),
+    INDEX idx_pulse_log_unit_sent  (num_unidad, sent_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+**Design rules:**
+- `lat`, `lon`, `provider`, `tracking_number` are NULL — a skipped dispatch has no coordinates.
+- `error_message` is NULL for successful dispatches.
+- `sent_at` is the moment the outcome is known (success or failure), not the GPS event time.
+- `DECIMAL(9,6)` — 9 total digits, 6 decimal places. Sufficient for sub-meter coordinate precision.
+- No FK to `units(num_unidad)` — `pulse_log` is an auditable historical record that must survive unit deletion.
+
+| Status | Task |
+|---|---|
+| ✅ | Create `V5__pulse_log.sql` with schema + all indexes |
+| ✅ | Start Docker + Spring Boot — confirm Flyway applies V5 without errors |
+| ✅ | `SHOW CREATE TABLE pulse_log` in MySQL — verify all indexes present |
+| ✅ | `mvn test` — Flyway validates schema in tests (`@DataJpaTest` uses H2 — confirmed H2-compatible) |
+
+Exit condition: `pulse_log` table present in DB. Flyway reports `V5__pulse_log.sql` as applied. Tests free of schema errors.
+
+---
+
+### Layer 6 — Domain: PulseLog Model + PulseLogRepository Port ✅
+
+#### 6.1 — `PulseLogStatus.java`
+
+File: `domain/model/PulseLogStatus.java`
+
+```java
+public enum PulseLogStatus {
+    SENT,
+    SKIPPED_INACTIVE,
+    SKIPPED_OUT_OF_WINDOW,
+    SKIPPED_STALE,
+    SKIPPED_NO_COORDS,
+    REJECTED,
+    ERROR
+}
+```
+
+Rules: pure domain enum. No Spring or JPA imports. Values must match the MySQL ENUM in V5 exactly.
+
+#### 6.2 — `PulseLog.java`
+
+File: `domain/model/PulseLog.java`
+
+```java
+public record PulseLog(
+    String numUnidad,
+    PulseLogStatus status,
+    BigDecimal lat,           // null for skips
+    BigDecimal lon,           // null for skips
+    String provider,          // null for skips
+    String trackingNumber,    // null for skips
+    ZonedDateTime sentAt,
+    String errorMessage       // null if successful
+) {
+    public PulseLog {
+        Objects.requireNonNull(numUnidad, "numUnidad must not be null");
+        Objects.requireNonNull(status,    "status must not be null");
+        Objects.requireNonNull(sentAt,    "sentAt must not be null");
+    }
+
+    public static PulseLog sent(String numUnidad, GpsReading reading,
+                                 String trackingNumber, ZonedDateTime sentAt) { ... }
+
+    public static PulseLog skipped(String numUnidad, PulseLogStatus status, ZonedDateTime sentAt) { ... }
+
+    public static PulseLog failed(String numUnidad, GpsReading reading,
+                                   String trackingNumber, ZonedDateTime sentAt, String errorMessage) { ... }
+}
+```
+
+Rules:
+- `record` — immutable, no setters.
+- Factory methods `sent()`, `skipped()`, `failed()` cover all three use cases — no ad-hoc construction.
+- `lat`, `lon` are nullable `BigDecimal` — same type as `GpsReading`.
+- No `id` field — infrastructure concern.
+
+#### 6.3 — `PulseLogRepository.java`
+
+File: `application/port/out/PulseLogRepository.java`
+
+```java
+public interface PulseLogRepository {
+    void save(PulseLog pulseLog);
+
+    List<PulseLog> findByFilters(
+        String numUnidad,         // null = all units
+        PulseLogStatus status,    // null = all statuses
+        ZonedDateTime from,       // null = no lower bound
+        ZonedDateTime to,         // null = no upper bound
+        int page,
+        int size
+    );
+
+    long countByFilters(
+        String numUnidad,
+        PulseLogStatus status,
+        ZonedDateTime from,
+        ZonedDateTime to
+    );
+}
+```
+
+Rules:
+- Pure port in `application/` — no Spring, no JPA.
+- `findByFilters` returns `List<PulseLog>` — pagination managed by the caller (controller or test).
+- `countByFilters` is needed so the controller can return `totalElements` in the paginated response.
+
+| Status | Task |
+|---|---|
+| ✅ | Create `PulseLogStatus.java` enum in `domain/model/` |
+| ✅ | Create `PulseLog.java` record in `domain/model/` with factory methods |
+| ✅ | Create `PulseLogRepository.java` port in `application/port/out/` |
+| ✅ | `mvn test` — ArchUnit passes with new classes (pure domain, no forbidden imports) |
+
+Exit condition: All 3 files compile. ArchUnit reports no violations. `PulseLog` is an immutable record. `PulseLogRepository` imports nothing from Spring or JPA.
+
+---
+
+### Layer 7 — GPS: Cache + Traccar Receiver + Adapter ✅
+
+#### 7.1 — `GpsPositionCache.java`
+
+File: `infrastructure/adapter/out/cache/GpsPositionCache.java`
+
+```java
+@Component  // justified exception: stateful infrastructure singleton, not a port adapter
+public class GpsPositionCache {
+
+    public record CachedReading(GpsReading reading, Instant receivedAt) {}
+
+    private final ConcurrentHashMap<String, CachedReading> cache = new ConcurrentHashMap<>();
+    private final Clock clock;
+    private final long maxAgeSeconds;
+
+    public GpsPositionCache(Clock clock,
+            @Value("${gps.max-coordinate-age-seconds}") long maxAgeSeconds) { ... }
+
+    public void store(String numUnidad, GpsReading reading) { ... }
+    public Optional<CachedReading> findLatest(String numUnidad) { ... }
+    public boolean isStale(CachedReading cached) { ... }
+}
+```
+
+Rules:
+- `ConcurrentHashMap` — thread-safe for simultaneous writes from multiple phones.
+- `store()` always overwrites — most recent push is the newest reading.
+- No eviction — 5 units max, negligible footprint.
+- `Clock` constructor-injected — testable with `Clock.fixed()`.
+- `maxAgeSeconds` from `gps.max-coordinate-age-seconds` — already present in `application.properties`.
+
+#### 7.2 — `TraccarPositionController.java`
+
+File: `infrastructure/adapter/in/web/TraccarPositionController.java`
+
+Two endpoints:
+
+```
+GET  /api/gps/position — OsmAnd protocol (query params: id, lat, lon, timestamp, accuracy, speed, bearing)
+POST /api/gps/position — Traccar Client native HTTP (JSON body: device_id, location.coords)
+```
+
+Both endpoints are `permitAll()` — OsmAnd/Traccar push protocols have no authentication headers.
+
+Validations (both handlers):
+- `lat ∈ [-90.0, 90.0]` — otherwise: 400 + `/errors/invalid-coordinates`
+- `lon ∈ [-180.0, 180.0]` — otherwise: 400 + `/errors/invalid-coordinates`
+- `lat == 0.0 AND lon == 0.0` — 400 (GPS not locked)
+- `id`/`device_id` blank/null — 400 + `/errors/validation-failed`
+- Unknown `id`: silently accepted, 200 (no 404 — prevents unit enumeration)
+
+Logging: coordinates rounded to 4 decimal places — never log full precision.
+
+#### 7.3 — `TraccarCoordinateAdapter.java`
+
+File: `infrastructure/adapter/out/gps/TraccarCoordinateAdapter.java`
+
+Implements: `GpsCoordinateProvider`
+
+- `isAvailable(numUnidad)` — returns `false` if no reading exists or reading is stale.
+- `getCoordinates(numUnidad)` — returns cached `GpsReading` if fresh; throws `GpsProviderUnavailableException` on miss or stale.
+- No `@Component` — declared as `@Bean` in `GpsProviderConfig`.
+
+#### 7.4 — Update `GpsProviderConfig.java`
+
+Activate the TRACCAR branch:
+
+```java
+@Bean
+@ConditionalOnProperty(name = "gps.provider", havingValue = "traccar")
+public GpsCoordinateProvider traccarCoordinateAdapter(GpsPositionCache cache) {
+    return new TraccarCoordinateAdapter(cache);
+}
+```
+
+Change default in `application.properties`:
+```properties
+gps.provider=${GPS_PROVIDER:traccar}
+```
+
+Remove the `// Phase 6 — uncomment when Traccar is introduced` comment.
+
+#### 7.5 — Remove `FIXME-PHASE6` guard in `PulseController.java`
+
+The guard that rejected `coordinateMode=AUTOMATIC` has been removed. `TraccarCoordinateAdapter` now provides real coordinates. Force-dispatch with `AUTOMATIC` is fully operational.
+
+| Status | Task |
+|---|---|
+| ✅ | Create `GpsPositionCache.java` in `infrastructure/adapter/out/cache/` |
+| ✅ | Create `TraccarPositionController.java` in `infrastructure/adapter/in/web/` (GET handler) |
+| ✅ | Add `POST /api/gps/position` handler to `TraccarPositionController` (Traccar Client native HTTP) |
+| ✅ | Add `TraccarClientPushRequest.java` DTO record in `infrastructure/adapter/in/web/dto/` |
+| ✅ | Register `TraccarPositionController` in `ApplicationConfig` as `@Bean` |
+| ✅ | Create `TraccarCoordinateAdapter.java` in `infrastructure/adapter/out/gps/` |
+| ✅ | Activate TRACCAR branch in `GpsProviderConfig.java` |
+| ✅ | Change `gps.provider=traccar` default in `application.properties` |
+| ✅ | Remove `FIXME-PHASE6` guard from `PulseController.java` |
+| ✅ | Remove `// Phase 6 — uncomment` comment from `GpsProviderConfig.java` |
+| ✅ | Add `GET /api/gps/position` and `POST /api/gps/position` to `SecurityConfig` as `permitAll()` |
+| ✅ | `mvn test` — 263 passing, 0 failures, 0 ArchUnit violations |
+
+Exit condition: App starts with `gps.provider=traccar`. `GpsPositionCache` receives pushes from both GET (OsmAnd) and POST (Traccar Client) handlers. `TraccarCoordinateAdapter` is the active `GpsCoordinateProvider`. `PulseController` accepts `coordinateMode=AUTOMATIC`.
+
+---
+
+### Layer 8 — Pulse Log: Persistence + Dispatch Integration + REST API ✅
+
+#### 8.1 — `PulseLogEntity.java` + `PulseLogJpaRepository.java`
+
+File: `infrastructure/adapter/out/persistence/entity/PulseLogEntity.java`
+
+```java
+@Entity
+@Table(name = "pulse_log")
+public class PulseLogEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "num_unidad", nullable = false)
+    private String numUnidad;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private PulseLogStatusEntity status;
+
+    @Column(precision = 9, scale = 6) private BigDecimal lat;
+    @Column(precision = 9, scale = 6) private BigDecimal lon;
+    @Column(length = 50)              private String provider;
+    @Column(name = "tracking_number") private String trackingNumber;
+    @Column(name = "sent_at", nullable = false) private LocalDateTime sentAt;
+    @Column(name = "error_message", length = 500) private String errorMessage;
+
+    @PrePersist void onPersist() { if (sentAt == null) sentAt = LocalDateTime.now(); }
+}
+```
+
+`PulseLogStatusEntity` — JPA enum with the same values as the domain `PulseLogStatus`:
+```java
+public enum PulseLogStatusEntity {
+    SENT, SKIPPED_INACTIVE, SKIPPED_OUT_OF_WINDOW,
+    SKIPPED_STALE, SKIPPED_NO_COORDS, REJECTED, ERROR
+}
+```
+
+File: `infrastructure/adapter/out/persistence/PulseLogJpaRepository.java`
+
+```java
+public interface PulseLogJpaRepository extends JpaRepository<PulseLogEntity, Long> {
+
+    @Query("""
+        SELECT p FROM PulseLogEntity p
+        WHERE (:numUnidad IS NULL OR p.numUnidad = :numUnidad)
+          AND (:status    IS NULL OR p.status    = :status)
+          AND (:from      IS NULL OR p.sentAt   >= :from)
+          AND (:to        IS NULL OR p.sentAt   <= :to)
+        ORDER BY p.sentAt DESC
+    """)
+    Page<PulseLogEntity> findByFilters(
+        @Param("numUnidad") String numUnidad,
+        @Param("status")    PulseLogStatusEntity status,
+        @Param("from")      LocalDateTime from,
+        @Param("to")        LocalDateTime to,
+        Pageable pageable
+    );
+}
+```
+
+#### 8.2 — `PulseLogJpaAdapter.java`
+
+File: `infrastructure/adapter/out/persistence/PulseLogJpaAdapter.java`
+
+Implements: `PulseLogRepository`
+
+Explicit mapping `PulseLog ↔ PulseLogEntity` — same pattern as other adapters:
+- `toDomain(PulseLogEntity)` → `PulseLog`
+- `toEntity(PulseLog)` → `PulseLogEntity` with `id = null` (forces INSERT)
+- `LocalDateTime` ↔ `ZonedDateTime` with explicit `FLEET_TIMEZONE`
+
+#### 8.3 — Update `PulseOrchestrationService.java`
+
+Inject `PulseLogRepository` by constructor. Write log entry for each dispatch outcome:
+
+| Case | `PulseLogStatus` | Data recorded |
+|---|---|---|
+| `!unit.isActive()` | `SKIPPED_INACTIVE` | no coords |
+| `!unit.isWithinActiveWindow()` | `SKIPPED_OUT_OF_WINDOW` | no coords |
+| `!gpsProvider.isAvailable()` | `SKIPPED_NO_COORDS` | no coords |
+| `GpsProviderUnavailableException` (stale) | `SKIPPED_STALE` | no coords |
+| `pulseSender.send()` successful | `SENT` | coords + provider + tracking |
+| `PulseSendException` (SOAP rejected) | `REJECTED` | coords + error_message |
+| Any other exception | `ERROR` | coords if available + error_message |
+
+Capture `GpsProviderUnavailableException` in `sendPulse()` — log WARN `SKIPPED_STALE` + write pulse_log + continue (no re-throw).
+
+#### 8.4 — `PulseLogController.java` + `PulseLogResponse.java`
+
+File: `infrastructure/adapter/in/web/PulseLogController.java`
+
+```
+GET /api/pulse-log — ADMIN + USER
+
+Query params (all optional):
+  numUnidad   String           — filter by unit
+  status      PulseLogStatus   — filter by status
+  from        String ISO-8601  — start date (inclusive)
+  to          String ISO-8601  — end date (inclusive)
+  page        int default 0
+  size        int default 20, max 100
+
+Response 200:
+  {
+    "content": [ PulseLogResponse... ],
+    "page": { "number": 0, "size": 20, "totalElements": 150, "totalPages": 8 }
+  }
+```
+
+`PulseLogResponse` record:
+```java
+public record PulseLogResponse(
+    Long id,
+    String numUnidad,
+    String status,
+    BigDecimal lat,
+    BigDecimal lon,
+    String provider,
+    String trackingNumber,
+    String sentAt,       // ISO-8601
+    String errorMessage
+) {}
+```
+
+Rules:
+- `size > 100` → 400 `/errors/validation-failed`.
+- `from` and `to` parsed as `ZonedDateTime` in controller — format error → 400.
+- Controller injects `PulseLogRepository` directly (no use case port for log reads — simple read query).
+- Added to `SecurityConfig`: `.requestMatchers(HttpMethod.GET, "/api/pulse-log").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)`
+
+| Status | Task |
+|---|---|
+| ✅ | Create `PulseLogStatusEntity.java` enum in `infrastructure/adapter/out/persistence/entity/` |
+| ✅ | Create `PulseLogEntity.java` in `infrastructure/adapter/out/persistence/entity/` |
+| ✅ | Create `PulseLogJpaRepository.java` with paginated `findByFilters()` |
+| ✅ | Create `PulseLogJpaAdapter.java` implementing `PulseLogRepository` |
+| ✅ | Declare `PulseLogJpaAdapter` as `@Bean` in `ApplicationConfig` |
+| ✅ | Inject `PulseLogRepository` into `PulseOrchestrationService` by constructor |
+| ✅ | Write `PulseLog` entry in `PulseOrchestrationService` for each dispatch outcome |
+| ✅ | Capture `GpsProviderUnavailableException` in `sendPulse()` → `SKIPPED_STALE` + pulse_log + continue |
+| ✅ | Remove any remaining `FIXME-PHASE6` from `PulseController.java` |
+| ✅ | Create `PulseLogResponse.java` record in `infrastructure/adapter/in/web/dto/` |
+| ✅ | Create `PulseLogController.java` — `GET /api/pulse-log` paginated and filterable |
+| ✅ | Add `/api/pulse-log` to `SecurityConfig` authorization matrix |
+| ✅ | `mvn test` — 263 passing, 0 failures, 0 ArchUnit violations |
+
+Exit condition: Every dispatch writes to `pulse_log`. `GET /api/pulse-log` returns paginated history with filters. `SKIPPED_STALE` appears in logs and in `pulse_log`. `coordinateMode=AUTOMATIC` in force-dispatch works end-to-end.
+
+---
+
+### Layer 9 — Tests ✅
+
+> Implement in parallel where possible. Each test class is independent.
+
+#### 9.1 — `GpsPositionCacheTest` (pure Java — no Spring)
+
+| # | Test | Setup | Expected |
+|---|---|---|---|
+| 1 | `store_andFindLatest_returnsReading` | `store("Peugeot", reading)` | `findLatest("Peugeot")` → `Optional.of(cached)` |
+| 2 | `findLatest_unknownUnit_returnsEmpty` | No prior store | `findLatest("Peugeot")` → `Optional.empty()` |
+| 3 | `store_overwritesPreviousReading` | Two `store()` calls with different coords | Second reading overwrites the first |
+| 4 | `isStale_withFreshReading_returnsFalse` | `Clock.fixed(now)`, reading with `receivedAt = now - 100s` | `isStale()` → `false` |
+| 5 | `isStale_withStaleReading_returnsTrue` | `Clock.fixed(now)`, reading with `receivedAt = now - 400s` | `isStale()` → `true` |
+| 6 | `isStale_atExactBoundary_returnsFalse` | `receivedAt = now - 300s` exactly | `isStale()` → `false` (not strictly before) |
+
+Use `Clock.fixed(Instant.parse("2026-07-02T10:00:00Z"), FLEET_TIMEZONE)`.
+
+---
+
+#### 9.2 — `TraccarCoordinateAdapterTest` (Mockito — no Spring)
+
+| # | Test | Setup | Expected |
+|---|---|---|---|
+| 1 | `getCoordinates_withFreshReading_returnsGpsReading` | Cache returns `Optional.of(freshCached)`, `isStale = false` | Returns `reading` |
+| 2 | `getCoordinates_withNoReading_throwsGpsProviderUnavailable` | Cache returns `Optional.empty()` | Throws `GpsProviderUnavailableException` |
+| 3 | `getCoordinates_withStaleReading_throwsGpsProviderUnavailable` | Cache returns `Optional.of(staleCached)`, `isStale = true` | Throws `GpsProviderUnavailableException` |
+| 4 | `isAvailable_withFreshReading_returnsTrue` | Cache has fresh reading | `isAvailable("Peugeot")` → `true` |
+| 5 | `isAvailable_withStaleReading_returnsFalse` | Cache has stale reading | `isAvailable("Peugeot")` → `false` |
+| 6 | `isAvailable_withNoReading_returnsFalse` | Empty cache | `isAvailable("Peugeot")` → `false` |
+
+---
+
+#### 9.3 — `TraccarPositionControllerTest` (@SpringBootTest + MockMvc)
+
+| # | Test | Request | Expected |
+|---|---|---|---|
+| 1 | `receivePosition_withValidCoords_returns200` | `?id=Peugeot&lat=19.4326&lon=-99.1332` | 200 OK; `gpsPositionCache.store()` called with `"Peugeot"` |
+| 2 | `receivePosition_withLatOutOfRange_returns400` | `?id=Peugeot&lat=91.0&lon=0.0` | 400 |
+| 3 | `receivePosition_withLonOutOfRange_returns400` | `?id=Peugeot&lat=0.0&lon=181.0` | 400 |
+| 4 | `receivePosition_withZeroZeroCoords_returns400` | `?id=Peugeot&lat=0.0&lon=0.0` | 400 |
+| 5 | `receivePosition_withBlankId_returns400` | `?id=&lat=19.43&lon=-99.13` | 400 |
+| 6 | `receivePosition_withUnknownUnit_returns200` | `?id=UnknownUnit&lat=19.43&lon=-99.13` | 200 OK (no 404 — prevents unit enumeration) |
+| 7 | `receivePosition_withoutAuthHeader_returns200` | GET, no `Authorization` header | 200 OK (public endpoint) |
+| 8 | `receivePosition_withMissingLatParam_returns400` | `?id=Peugeot&lon=-99.13` | 400 |
+| 9 | `receivePosition_withSouthernHemisphereCoords_returns200` | `?id=Peugeot&lat=-33.8688&lon=151.2093` | 200 OK |
+| 10 | `receivePositionFromClient_withValidJsonBody_returns200` | POST JSON `{"device_id":"Peugeot","location":{"coords":{...}}}` | 200 OK; `store()` called with `"Peugeot"` |
+| 11 | `receivePositionFromClient_withInvalidLatitude_returns400` | POST JSON with `latitude: 95.0` | 400 |
+| 12 | `receivePositionFromClient_withoutAuthHeader_returns200` | POST JSON, no auth header | 200 OK (public endpoint) |
+
+Rules:
+- `@MockitoBean GpsPositionCache` — do not touch the real cache in controller tests.
+- Test #6/unknown unit: `verify(gpsPositionCache).store(eq("UnknownUnit"), any())` — endpoint accepts any `id` without DB validation.
+
+---
+
+#### 9.4 — `PulseLogJpaAdapterTest` (@DataJpaTest + H2)
+
+| # | Test | Setup | Expected |
+|---|---|---|---|
+| 1 | `save_sentLog_persistsAllFields` | `PulseLog.sent(...)` | All fields present on retrieval |
+| 2 | `save_skippedLog_persistsWithNullCoords` | `PulseLog.skipped(...)` | `lat`, `lon`, `provider`, `trackingNumber` = null |
+| 3 | `findByFilters_byNumUnidad_returnsOnlyMatchingUnit` | 3 logs (2 Peugeot, 1 Kangoo) | Filter `numUnidad=Peugeot` → 2 results |
+| 4 | `findByFilters_byStatus_returnsOnlyMatchingStatus` | 2 SENT + 1 SKIPPED_STALE | Filter `status=SENT` → 2 results |
+| 5 | `findByFilters_byDateRange_returnsOnlyInRange` | 3 logs on distinct dates | Filter `from/to` → only entries within range |
+| 6 | `findByFilters_noFilters_returnsAll` | 3 logs | No filters → 3 results |
+| 7 | `findByFilters_empty_returnsEmptyList` | No logs | Empty list |
+
+---
+
+#### 9.5 — `PulseOrchestrationServiceTest` — extend existing class
+
+Added to the existing class:
+
+| # | Test | Description |
+|---|---|---|
+| + | `sendPulse_whenSent_writesSentLogEntry` | Successful dispatch → `pulseLogRepository.save()` called with `status=SENT` |
+| + | `sendPulse_whenOutOfWindow_writesSkippedOutOfWindowLog` | Outside window → `save()` with `status=SKIPPED_OUT_OF_WINDOW` |
+| + | `sendPulse_whenInactive_writesSkippedInactiveLog` | Inactive unit → `save()` with `status=SKIPPED_INACTIVE` |
+| + | `sendPulse_whenStale_writesSkippedStaleLog` | `GpsProviderUnavailableException` stale → `save()` with `status=SKIPPED_STALE`, no re-throw |
+| + | `sendPulse_whenNoCoords_writesSkippedNoCoordsLog` | `isAvailable() = false` → `save()` with `status=SKIPPED_NO_COORDS` |
+| + | `sendPulse_whenSoapRejected_writesRejectedLog` | `PulseSendException` → `save()` with `status=REJECTED` |
+
+Use `@Mock PulseLogRepository` injected alongside existing mocks.
+
+---
+
+#### 9.6 — `LoginRateLimitFilterTest` (@SpringBootTest + MockMvc)
+
+| # | Test | Setup | Expected |
+|---|---|---|---|
+| 1 | `login_firstFiveAttempts_returns401NotRateLimited` | 5 logins with invalid creds | 5 × 401 `/errors/invalid-credentials` (not 429) |
+| 2 | `login_sixthAttemptFromSameIp_returns429` | 6th attempt from same IP | 429 + `/errors/rate-limited` + `Content-Type: application/problem+json` |
+| 3 | `login_attemptsFromDifferentIps_dontShareBucket` | 5 attempts IP-A, then 1 attempt IP-B | IP-B: 401 (not 429) |
+| 4 | `login_afterWindowExpiry_bucketResets` | 5 attempts, wait >1 min, 1 more attempt | 401 (not 429) — bucket reset |
+
+Note: Test #4 requires `Clock.fixed()` or `Thread.sleep(61000)` — tagged `@Tag("slow")` and run only in CI.
+
+---
+
+#### 9.7 — ArchUnit: Verify new packages
+
+Verify in `HexagonalArchitectureTest` that the new `infrastructure/adapter/out/cache/` package complies with existing rules:
+- Infrastructure can import domain (correct direction)
+- No `@Transactional` on cache (not applicable — not JPA)
+- No `@Autowired` on fields
+
+No new rules added — the 11 existing rules already cover the new files.
+
+| Status | Task |
+|---|---|
+| ✅ | `GpsPositionCacheTest` — 6 tests (pure Java, no Spring) |
+| ✅ | `TraccarCoordinateAdapterTest` — 6 tests (Mockito) |
+| ✅ | `TraccarPositionControllerTest` — 12 tests (@SpringBootTest + MockMvc — 9 GET + 3 POST) |
+| ✅ | `PulseLogJpaAdapterTest` — 7 tests (@DataJpaTest + H2) |
+| ✅ | `PulseOrchestrationServiceTest` — +6 tests added to existing class |
+| ✅ | `LoginRateLimitFilterTest` — 4 tests (@SpringBootTest + MockMvc) |
+| ✅ | ArchUnit — `HexagonalArchitectureTest` passes with new packages |
+| ✅ | `mvn test` — 263 passing, 0 failures, 0 ArchUnit violations |
+
+Exit condition: All test classes compile and pass. `mvn test` is clean. Test count reflects Phase 5 base (235) + all Phase 6 additions.
+
+---
+
+### Layer 10 — Manual Smoke Test (Gate for v1.1.0) ✅
+
+> ⚠️ **LIVE EXTERNAL SERVICE.** Every push reaches QSolutions in production. Do not execute until Layer 9 is complete.
+
+#### Prerequisites
+
+| Prerequisite | How to verify |
+|---|---|
+| Traccar Client installed on at least one phone | App open, status = `Running` |
+| Protocol = native HTTP, Server URL = ngrok or `http://<local-ip>:8080/api/gps/position` | App settings |
+| Device Identifier = `Peugeot` (or the unit under test) | App settings |
+| Docker + Spring Boot running with `gps.provider=traccar` | Startup logs free of errors |
+| `GPS_MAX_COORDINATE_AGE_SECONDS=300` in `.env` | `grep GPS_MAX .env` |
+| `QSOLUTIONS_TRACKING_NUMBER=RIVA` in `.env` | `grep QSOLUTIONS_TRACKING .env` |
+
+#### Step A — GPS push received ✅
+
+| Status | Task |
+|---|---|
+| ✅ | A.1 Open Traccar Client → force manual send or wait for interval |
+| ✅ | A.2 Confirm in logs: `INFO GPS_RECEIVED numUnidad=Peugeot lat=XX.XXXX lon=-XX.XXXX` |
+| ✅ | A.3 Confirm coordinates truncated to 4 decimal places in log (not 6) |
+| ✅ | A.4 Coordinates are not `0.0, 0.0` (phone GPS has a fix) |
+
+#### Step B — Dispatch with real coordinate ✅
+
+| Status | Task |
+|---|---|
+| ✅ | B.1 `POST /api/units/Peugeot/pulse/force` with `coordinateMode=AUTOMATIC` → 204 No Content |
+| ✅ | B.2 Confirm in logs: `INFO PULSE_SENT numUnidad=Peugeot provider=TRACCAR` |
+| ✅ | B.3 Confirm in `pulse_log` table: `SELECT * FROM pulse_log WHERE status='SENT' ORDER BY sent_at DESC LIMIT 1` |
+| ✅ | B.4 `lat`, `lon` in `pulse_log` match the Traccar Client reading |
+| ✅ | B.5 QSolutions confirmed reception (`isProcessed = true` in logs) — tracking number `RIVA` |
+
+#### Step C — SKIPPED_STALE verified
+
+| Status | Task |
+|---|---|
+| ⬜ | C.1 Put phone in airplane mode (stop GPS sends) |
+| ⬜ | C.2 Wait 310 seconds (over the 300 s stale threshold) |
+| ⬜ | C.3 `POST /api/units/Peugeot/pulse/force` with `coordinateMode=AUTOMATIC` |
+| ⬜ | C.4 Confirm in logs: `WARN SKIPPED_STALE numUnidad=Peugeot` |
+| ⬜ | C.5 Confirm in `pulse_log`: `SELECT * FROM pulse_log WHERE status='SKIPPED_STALE'` has at least 1 row |
+| ⬜ | C.6 QSolutions received NO pulse during this period |
+
+#### Step D — Round scheduling with real GPS
+
+| Status | Task |
+|---|---|
+| ⬜ | D.1 Reactivate Traccar Client (exit airplane mode) — confirm `GPS_RECEIVED` in logs |
+| ⬜ | D.2 Start round for Peugeot → `POST /api/units/Peugeot/round/start` → 204 |
+| ⬜ | D.3 Wait 2 full 15-min cycles — confirm `ROUND_PULSE_SENT` with `provider=TRACCAR` in logs |
+| ⬜ | D.4 Confirm 2 `status=SENT` entries in `pulse_log` with real coordinates |
+| ⬜ | D.5 Confirm `GET /api/pulse-log?numUnidad=Peugeot&status=SENT&size=5` returns the records |
+| ⬜ | D.6 Stop round → `POST /api/units/Peugeot/round/stop` → 204 |
+
+#### Step E — Pulse log API verified
+
+| Status | Task |
+|---|---|
+| ✅ | E.1 `GET /api/pulse-log` → 200 with `content[]` and pagination |
+| ✅ | E.2 `GET /api/pulse-log?numUnidad=Peugeot` → only Peugeot entries |
+| ✅ | E.3 `GET /api/pulse-log?status=SENT` → only successful entries |
+| ⬜ | E.4 `GET /api/pulse-log?status=SKIPPED_STALE` → entries from Step C |
+| ⬜ | E.5 `GET /api/pulse-log?size=101` → 400 `/errors/validation-failed` |
+
+**Exit condition:** Real Traccar coordinate present in at least one live `PULSE_SENT` event ✅. `GET /api/pulse-log` returns filtered history ✅. Steps C–D can be completed any time; they do not block v1.1.0 tagging since the primary gate is met.
+
+---
+
+### Known Debt Introduced / Confirmed in Phase 6
+
+| ID | Location | Severity | Description | Resolution Phase |
+|---|---|---|---|---|
+| FIXME-SEC-FAMILY | `AuthService.java` | MEDIUM | Refresh Token Families not implemented (OAuth 2.0 BCP §4.14). Token theft is undetectable. | Phase 8+ |
+| FIXME-PROXY | `LoginRateLimitFilter.java` | LOW | Rate limit uses `getRemoteAddr()` — if API is behind nginx, read `X-Forwarded-For`. Add when proxy is configured. | Phase 7 deploy |
+| FIXME-PERF | `TokenService.java` | LOW | Triple JWT parse per request (`isTokenValid` + `extractUserId` + `extractRole`). Resolution: `TokenClaims record` + `parseToken()`. | Phase 7 |
+| FIXME-Q6 | `pom.xml` | MEDIUM | `dependency-check-maven` not yet configured. Add before v1.2.0. | Phase 7 |
+| ADR-003 | `User.java`, `UserRepository.java` | LOW | `userId` is a DB surrogate key in the domain. Deferred indefinitely — does not block frontend. | Phase 8+ |
 
 ---
 

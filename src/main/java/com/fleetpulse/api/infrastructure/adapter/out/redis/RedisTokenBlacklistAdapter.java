@@ -2,6 +2,7 @@ package com.fleetpulse.api.infrastructure.adapter.out.redis;
 
 import com.fleetpulse.api.application.port.out.TokenBlacklist;
 import com.fleetpulse.api.domain.exception.ExternalServiceUnavailableException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -23,9 +24,7 @@ public class RedisTokenBlacklistAdapter implements TokenBlacklist {
     public void blacklist(String token, Duration remainingTtl) {
         try {
             redisTemplate.opsForValue().set(token, "1", remainingTtl);
-            // FIXME-IMPORT-1: DataAccessException used as fully qualified name in catch blocks.
-            // Move to import header for consistency. Cosmetic — no functional impact.
-        } catch (org.springframework.dao.DataAccessException e) {
+        } catch (DataAccessException e) {
             throw new ExternalServiceUnavailableException("Redis unavailable during token validation: ", e);
         }
     }
@@ -35,9 +34,8 @@ public class RedisTokenBlacklistAdapter implements TokenBlacklist {
     public boolean isBlacklisted(String token) {
         try {
             Boolean hasKey = redisTemplate.hasKey(token);
-
             return Boolean.TRUE.equals(hasKey);
-        } catch (org.springframework.dao.DataAccessException e) {
+        } catch (DataAccessException e) {
             throw new ExternalServiceUnavailableException("Redis unavailable during token validation: ", e);
         }
     }

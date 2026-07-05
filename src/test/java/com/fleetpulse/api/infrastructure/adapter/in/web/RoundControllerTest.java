@@ -96,11 +96,11 @@ class RoundControllerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON));
     }
 
-    // 9.8.5
+    // 9.8.5 — controller propagates InvalidCoordinateException from use case → 400
     @Test
-    void startRound_withAutomaticMode_returns400() throws Exception {
+    void startRound_withAutomaticMode_andUseCaseRejectsCoords_returns400() throws Exception {
         String token = tokenService.generateAccessToken(1L, "ADMIN");
-        doThrow(new InvalidCoordinateException("AUTOMATIC mode not supported until Phase 6"))
+        doThrow(new InvalidCoordinateException("Coordinates out of range"))
                 .when(manageRoundUseCase).startRound(any(), any(), any(), any());
 
         mockMvc.perform(post("/api/units/Peugeot/round/start")

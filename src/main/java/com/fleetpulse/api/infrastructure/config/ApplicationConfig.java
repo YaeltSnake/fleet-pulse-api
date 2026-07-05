@@ -10,11 +10,13 @@ import com.fleetpulse.api.application.service.RoundManagementService;
 import com.fleetpulse.api.application.service.UnitManagementService;
 import com.fleetpulse.api.application.service.UserManagementService;
 import com.fleetpulse.api.domain.model.FleetConstants;
+import com.fleetpulse.api.infrastructure.adapter.out.cache.GpsPositionCache;
 import com.fleetpulse.api.infrastructure.adapter.out.soap.QSolutionsSoapAdapter;
 import com.fleetpulse.api.infrastructure.init.AdminUserInitializer;
 import com.fleetpulse.api.infrastructure.security.BcryptPasswordHasherAdapter;
 import com.fleetpulse.api.infrastructure.security.JwtAuthenticationFilter;
 import com.fleetpulse.api.infrastructure.security.JwtService;
+import com.fleetpulse.api.infrastructure.security.LoginRateLimitFilter;
 import com.fleetpulse.api.infrastructure.security.SpringSecurityUserDetailsAdapter;
 import jakarta.xml.ws.BindingProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,6 +46,12 @@ public class ApplicationConfig {
         return new JwtService(secret, accessExpirySeconds, refreshExpirySeconds);
     }
 
+
+    @Bean
+    public LoginRateLimitFilter loginRateLimitFilter(
+            @Value("${app.rate-limit.login.max-attempts:5}") int maxAttempts) {
+        return new LoginRateLimitFilter(maxAttempts);
+    }
 
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(TokenService tokenService, TokenBlacklist tokenBlacklist){
@@ -122,13 +130,22 @@ public class ApplicationConfig {
     }
 
     @Bean
+    public GpsPositionCache gpsPositionCache(
+            Clock clock,
+            @Value("${gps.max-coordinate-age-seconds}") long maxAgeSeconds) {
+        return new GpsPositionCache(clock, maxAgeSeconds);
+    }
+
+    @Bean
     public PulseOrchestrationService pulseOrchestrationService(
             UnitRepository unitRepository,
             GpsCoordinateProvider gpsProvider,
             PulseSender pulseSender,
+            PulseLogRepository pulseLogRepository,
             @Value("${qsolutions.tracking-number}") String defaultTrackingNumber,
             Clock clock) {
-        return new PulseOrchestrationService(unitRepository, gpsProvider, pulseSender, defaultTrackingNumber, clock);
+        return new PulseOrchestrationService(
+                unitRepository, gpsProvider, pulseSender, pulseLogRepository, defaultTrackingNumber, clock);
     }
 
     @Bean

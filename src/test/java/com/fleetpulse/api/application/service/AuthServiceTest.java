@@ -55,6 +55,7 @@ class AuthServiceTest {
         assertThat(result.refreshToken()).isEqualTo("Refresh Token");
         assertThat(result.expiresAt()).isEqualTo(expectedExpiry);
         verify(passwordHasher).matches("password", "hash");
+        verify(refreshTokenRepository).revokeAllByUserId(1L);
         verify(refreshTokenRepository).save(any(RefreshToken.class));
     }
 
@@ -131,6 +132,8 @@ class AuthServiceTest {
         authService.login(new LoginCommand("user", "password"));
 
         // Assert
+        verify(refreshTokenRepository).revokeAllByUserId(1L);
+
         ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(captor.capture());
         RefreshToken saved = captor.getValue();
@@ -266,6 +269,26 @@ class AuthServiceTest {
         // Assert
         verify(refreshTokenRepository).revokeByToken("refresh-token");
         verify(tokenBlacklist).blacklist(accessToken, remaining);
+    }
+
+    @Test
+    void logout_withExpiredRefreshToken_stillBlacklistsAccessToken() {
+        // Arrange: refresh token is expired, but access token still has TTL
+        Instant past = Instant.now().minusSeconds(1);
+        RefreshToken expiredRefresh = new RefreshToken("expired-refresh", 1L, past, false);
+        String accessToken = "access-token";
+        Duration remaining = Duration.ofMinutes(10);
+
+        when(refreshTokenRepository.findByToken("expired-refresh")).thenReturn(Optional.of(expiredRefresh));
+        when(tokenService.extractUserId(accessToken)).thenReturn(1L);
+        when(tokenService.remainingTtl(accessToken)).thenReturn(remaining);
+
+        // Act
+        authService.logout(accessToken, "expired-refresh");
+
+        // Assert: partial logout — access token blacklisted even though refresh was expired
+        verify(tokenBlacklist).blacklist(accessToken, remaining);
+        verify(refreshTokenRepository).revokeByToken("expired-refresh");
     }
 
     @Test

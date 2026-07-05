@@ -1,6 +1,7 @@
 package com.fleetpulse.api.infrastructure.adapter.in.web;
 
 import com.fleetpulse.api.application.port.in.SendPulseUseCase;
+import com.fleetpulse.api.application.port.out.GpsCoordinateProvider;
 import com.fleetpulse.api.domain.exception.InvalidCoordinateException;
 import com.fleetpulse.api.domain.model.CoordinateMode;
 import com.fleetpulse.api.domain.model.FleetConstants;
@@ -31,17 +32,18 @@ import java.util.Objects;
 public class PulseController {
 
     private final SendPulseUseCase sendPulseUseCase;
+    private final GpsCoordinateProvider gpsProvider;
 
-    public PulseController(SendPulseUseCase sendPulseUseCase) {
-        this.sendPulseUseCase = Objects.requireNonNull(sendPulseUseCase,
-                "sendPulseUseCase must not be null");
+    public PulseController(SendPulseUseCase sendPulseUseCase, GpsCoordinateProvider gpsProvider) {
+        this.sendPulseUseCase = Objects.requireNonNull(sendPulseUseCase, "sendPulseUseCase must not be null");
+        this.gpsProvider = Objects.requireNonNull(gpsProvider, "gpsProvider must not be null");
     }
 
     @PostMapping("/{numUnidad}/pulse/force")
     @Operation(
             summary = "Force-dispatch a GPS pulse for a single unit with operator-supplied coordinates",
             description = "Bypasses the schedule window check. coordinateMode=MANUAL requires lat and lon. "
-                    + "coordinateMode=AUTOMATIC is reserved for Phase 6 (TraccarCoordinateAdapter).")
+                    + "coordinateMode=AUTOMATIC uses live Traccar GPS coordinates from cache (503 if unavailable or stale).")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Pulse dispatched and confirmed by QSolutions"),
             @ApiResponse(responseCode = "400", description = "Invalid or missing coordinates, or unsupported coordinateMode",
@@ -63,22 +65,18 @@ public class PulseController {
             @PathVariable String numUnidad,
             @Valid @RequestBody ForcePulseRequest request) {
 
-        // FIXME-PHASE6: remove this guard when TraccarCoordinateAdapter is wired (Phase 6)
+        GpsReading reading;
         if (request.coordinateMode() == CoordinateMode.AUTOMATIC) {
-            throw new InvalidCoordinateException("AUTOMATIC mode not supported until Phase 6");
+            // GpsProviderUnavailableException → 503 via GlobalExceptionHandler
+            reading = gpsProvider.getCoordinates(numUnidad);
+        } else {
+            if (request.lat() == null || request.lon() == null) {
+                throw new InvalidCoordinateException("MANUAL mode requires lat and lon");
+            }
+            // GpsReading constructor validates range — throws InvalidCoordinateException if OOB or (0,0)
+            reading = new GpsReading(numUnidad, request.lat(), request.lon(),
+                    ZonedDateTime.now(FleetConstants.FLEET_TIMEZONE), ProviderType.MANUAL);
         }
-
-        if (request.lat() == null || request.lon() == null) {
-            throw new InvalidCoordinateException("MANUAL mode requires lat and lon");
-        }
-
-        // GpsReading constructor validates range — throws InvalidCoordinateException if OOB or (0,0)
-        GpsReading reading = new GpsReading(
-                numUnidad,
-                request.lat(),
-                request.lon(),
-                ZonedDateTime.now(FleetConstants.FLEET_TIMEZONE),
-                ProviderType.MANUAL);
 
         sendPulseUseCase.dispatch(numUnidad, reading);
 

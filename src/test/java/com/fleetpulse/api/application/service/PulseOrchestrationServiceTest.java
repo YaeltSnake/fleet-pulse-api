@@ -1,6 +1,7 @@
 package com.fleetpulse.api.application.service;
 
 import com.fleetpulse.api.application.port.out.GpsCoordinateProvider;
+import com.fleetpulse.api.application.port.out.PulseLogRepository;
 import com.fleetpulse.api.application.port.out.PulseSender;
 import com.fleetpulse.api.application.port.out.UnitRepository;
 import com.fleetpulse.api.domain.exception.GpsProviderUnavailableException;
@@ -49,13 +50,15 @@ class PulseOrchestrationServiceTest {
     @Mock private UnitRepository unitRepository;
     @Mock private GpsCoordinateProvider gpsProvider;
     @Mock private PulseSender pulseSender;
+    @Mock private PulseLogRepository pulseLogRepository;
 
     private PulseOrchestrationService service;
 
     @BeforeEach
     void setUp() {
         service = new PulseOrchestrationService(
-                unitRepository, gpsProvider, pulseSender, "default-tracking", FIXED_CLOCK);
+                unitRepository, gpsProvider, pulseSender, pulseLogRepository,
+                "default-tracking", FIXED_CLOCK);
     }
 
     // ── sendPulse() ────────────────────────────────────────────────────────────
@@ -92,16 +95,18 @@ class PulseOrchestrationServiceTest {
         verifyNoInteractions(pulseSender);
     }
 
-    // 9.3.4
+    // 9.3.4 — GPS unavailable: getCoordinates throws → SKIPPED, pulseSender not called
     @Test
     void sendPulse_withGpsNotAvailable_silentlySkips() {
         Unit active = unit("Peugeot", true, LocalTime.of(9, 0), LocalTime.of(17, 0), null);
         when(unitRepository.findByNumUnidad("Peugeot")).thenReturn(Optional.of(active));
-        when(gpsProvider.isAvailable("Peugeot")).thenReturn(false);
+        when(gpsProvider.getCoordinates("Peugeot"))
+                .thenThrow(new GpsProviderUnavailableException("No GPS data received yet for unit: Peugeot"));
 
         service.sendPulse("Peugeot");
 
         verifyNoInteractions(pulseSender);
+        verify(pulseLogRepository).save(any());
     }
 
     // 9.3.5
@@ -109,7 +114,6 @@ class PulseOrchestrationServiceTest {
     void sendPulse_withActiveUnitInWindow_callsPulseSender() {
         Unit active = unit("Peugeot", true, LocalTime.of(9, 0), LocalTime.of(17, 0), null);
         when(unitRepository.findByNumUnidad("Peugeot")).thenReturn(Optional.of(active));
-        when(gpsProvider.isAvailable("Peugeot")).thenReturn(true);
         when(gpsProvider.getCoordinates("Peugeot")).thenReturn(reading("Peugeot"));
 
         service.sendPulse("Peugeot");
@@ -122,7 +126,6 @@ class PulseOrchestrationServiceTest {
     void sendPulse_withNullUnitTrackingNumber_usesDefaultTrackingNumber() {
         Unit active = unit("Peugeot", true, LocalTime.of(9, 0), LocalTime.of(17, 0), null);
         when(unitRepository.findByNumUnidad("Peugeot")).thenReturn(Optional.of(active));
-        when(gpsProvider.isAvailable("Peugeot")).thenReturn(true);
         when(gpsProvider.getCoordinates("Peugeot")).thenReturn(reading("Peugeot"));
 
         service.sendPulse("Peugeot");
@@ -137,7 +140,6 @@ class PulseOrchestrationServiceTest {
     void sendPulse_withUnitTrackingNumber_usesUnitTrackingNumber() {
         Unit active = unit("Peugeot", true, LocalTime.of(9, 0), LocalTime.of(17, 0), "unit-tracking");
         when(unitRepository.findByNumUnidad("Peugeot")).thenReturn(Optional.of(active));
-        when(gpsProvider.isAvailable("Peugeot")).thenReturn(true);
         when(gpsProvider.getCoordinates("Peugeot")).thenReturn(reading("Peugeot"));
 
         service.sendPulse("Peugeot");
@@ -240,34 +242,33 @@ class PulseOrchestrationServiceTest {
         verify(pulseSender).send(any(ScheduledPulse.class));
     }
 
-    // 9.3.16 — sendPulse() propagates PulseSendException from pulseSender.send()
+    // 9.3.16 — sendPulse() swallows PulseSendException, saves REJECTED log, does not re-throw
     @Test
-    void sendPulse_propagatesPulseSendException() {
-        // Arrange
+    void sendPulse_onPulseSendException_swallowsAndSavesRejectedLog() {
         Unit active = unit("Peugeot", true, LocalTime.of(9, 0), LocalTime.of(17, 0), null);
         when(unitRepository.findByNumUnidad("Peugeot")).thenReturn(Optional.of(active));
-        when(gpsProvider.isAvailable("Peugeot")).thenReturn(true);
         when(gpsProvider.getCoordinates("Peugeot")).thenReturn(reading("Peugeot"));
         doThrow(new PulseSendException("QSolutions rejected pulse")).when(pulseSender).send(any());
 
-        // Act / Assert: exception propagates without swallowing
-        assertThatThrownBy(() -> service.sendPulse("Peugeot"))
-                .isInstanceOf(PulseSendException.class);
+        // Must NOT throw — scheduler path is resilient
+        service.sendPulse("Peugeot");
+
+        verify(pulseLogRepository).save(any());
     }
 
-    // 9.3.17 — sendPulse() propagates GpsProviderUnavailableException from gpsProvider
+    // 9.3.17 — sendPulse() swallows GpsProviderUnavailableException, saves SKIPPED log
     @Test
-    void sendPulse_propagatesGpsProviderUnavailableException() {
-        // Arrange
+    void sendPulse_onGpsUnavailable_swallowsAndSavesSkippedLog() {
         Unit active = unit("Peugeot", true, LocalTime.of(9, 0), LocalTime.of(17, 0), null);
         when(unitRepository.findByNumUnidad("Peugeot")).thenReturn(Optional.of(active));
-        when(gpsProvider.isAvailable("Peugeot")).thenReturn(true);
         when(gpsProvider.getCoordinates("Peugeot"))
-                .thenThrow(new GpsProviderUnavailableException("GPS device offline"));
+                .thenThrow(new GpsProviderUnavailableException("No GPS data received yet for unit: Peugeot"));
 
-        // Act / Assert: exception propagates without swallowing
-        assertThatThrownBy(() -> service.sendPulse("Peugeot"))
-                .isInstanceOf(GpsProviderUnavailableException.class);
+        // Must NOT throw
+        service.sendPulse("Peugeot");
+
+        verify(pulseLogRepository).save(any());
+        verifyNoInteractions(pulseSender);
     }
 
     // 9.3.18 — dispatch() must never touch the GPS provider (ADR-014 / ADR-016)

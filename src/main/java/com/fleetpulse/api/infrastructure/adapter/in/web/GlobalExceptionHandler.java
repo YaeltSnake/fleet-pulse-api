@@ -10,7 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
-import org.springframework.web.bind.MissingRequestValueException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.security.access.AccessDeniedException;
@@ -407,6 +407,25 @@ public class GlobalExceptionHandler {
         addStandardProperties(problem, request);
 
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(problem);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ProblemDetail> handleMissingRequestParam(
+            MissingServletRequestParameterException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("MISSING_REQUEST_PARAM: {} - path: {}, client: {}",
+                ex.getParameterName(),
+                request.getRequestURI(),
+                request.getRemoteAddr());
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setType(URI.create(VALIDATION_FAILED));
+        problem.setTitle("Missing required parameter");
+        problem.setDetail("Required parameter '" + ex.getParameterName() + "' is missing");
+        addStandardProperties(problem, request);
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)

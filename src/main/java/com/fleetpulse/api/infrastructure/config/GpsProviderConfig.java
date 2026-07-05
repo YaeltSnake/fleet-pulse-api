@@ -1,7 +1,9 @@
 package com.fleetpulse.api.infrastructure.config;
 
 import com.fleetpulse.api.application.port.out.GpsCoordinateProvider;
+import com.fleetpulse.api.infrastructure.adapter.out.cache.GpsPositionCache;
 import com.fleetpulse.api.infrastructure.adapter.out.gps.ManualCoordinateAdapter;
+import com.fleetpulse.api.infrastructure.adapter.out.gps.TraccarCoordinateAdapter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -23,10 +25,9 @@ public class GpsProviderConfig {
         return new ManualCoordinateAdapter(props);
     }
 
-    // Phase 6 — uncomment when Traccar is introduced:
-    // @Bean
-    // @ConditionalOnProperty(name = "gps.provider", havingValue = "traccar")
-    // public GpsCoordinateProvider traccarCoordinateAdapter(GpsPositionCache cache) {
-    //     return new TraccarCoordinateAdapter(cache);
-    // }
+    @Bean
+    @ConditionalOnProperty(name = "gps.provider", havingValue = "traccar")
+    public GpsCoordinateProvider traccarCoordinateAdapter(GpsPositionCache cache) {
+        return new TraccarCoordinateAdapter(cache);
+    }
 }

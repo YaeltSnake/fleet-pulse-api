@@ -1,15 +1,13 @@
 package com.fleetpulse.api.infrastructure.security;
 
 import com.fleetpulse.api.application.port.out.PasswordHasher;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 public class BcryptPasswordHasherAdapter implements PasswordHasher {
 
-    // FIXME-IMPORT-2: PasswordEncoder used as fully qualified name in field and constructor.
-    // Move to import header for consistency. Cosmetic — no functional impact.
-    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
-    public BcryptPasswordHasherAdapter(
-            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
+    public BcryptPasswordHasherAdapter(PasswordEncoder passwordEncoder) {
         this.passwordEncoder = passwordEncoder;
     }
 

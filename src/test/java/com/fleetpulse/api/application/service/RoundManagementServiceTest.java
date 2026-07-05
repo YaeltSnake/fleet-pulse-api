@@ -97,15 +97,17 @@ class RoundManagementServiceTest {
                 .isInstanceOf(RoundAlreadyActiveException.class);
     }
 
-    // 9.4.4
+    // 9.4.4 — AUTOMATIC mode is now supported: no lat/lon required at startRound
     @Test
-    void startRound_withAutomaticMode_throwsInvalidCoordinateException() {
+    void startRound_withAutomaticMode_andScheduledUnit_registersRoundInActiveMap() {
         when(unitRepository.findByNumUnidad("Peugeot"))
                 .thenReturn(Optional.of(activeUnit("Peugeot")));
 
-        assertThatThrownBy(() -> service.startRound("Peugeot", CoordinateMode.AUTOMATIC, null, null))
-                .isInstanceOf(InvalidCoordinateException.class)
-                .hasMessageContaining("AUTOMATIC");
+        service.startRound("Peugeot", CoordinateMode.AUTOMATIC, null, null);
+
+        assertThat(service.activeRounds()).containsKey("Peugeot");
+        assertThat(service.activeRounds().get("Peugeot").coordinateMode())
+                .isEqualTo(CoordinateMode.AUTOMATIC);
     }
 
     // 9.4.5

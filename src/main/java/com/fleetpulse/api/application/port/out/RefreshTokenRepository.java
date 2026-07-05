@@ -9,6 +9,7 @@ public interface RefreshTokenRepository {
     Optional<RefreshToken> findByToken(String token);
     RefreshToken save(RefreshToken token);
     void revokeByToken(String token);
+    void revokeAllByUserId(Long userId);
     void deleteAllExpired();
 
 }
