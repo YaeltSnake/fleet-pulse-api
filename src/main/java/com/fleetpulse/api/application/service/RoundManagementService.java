@@ -3,6 +3,7 @@ package com.fleetpulse.api.application.service;
 import com.fleetpulse.api.application.port.in.ManageRoundUseCase;
 import com.fleetpulse.api.application.port.in.SendPulseUseCase;
 import com.fleetpulse.api.application.port.out.GpsCoordinateProvider;
+import com.fleetpulse.api.application.port.out.PulseLogRepository;
 import com.fleetpulse.api.application.port.out.UnitRepository;
 import com.fleetpulse.api.domain.exception.GpsProviderUnavailableException;
 import com.fleetpulse.api.domain.exception.InvalidCoordinateException;
@@ -14,6 +15,8 @@ import com.fleetpulse.api.domain.exception.UnitNotFoundException;
 import com.fleetpulse.api.domain.model.CoordinateMode;
 import com.fleetpulse.api.domain.model.GpsReading;
 import com.fleetpulse.api.domain.model.ProviderType;
+import com.fleetpulse.api.domain.model.PulseLog;
+import com.fleetpulse.api.domain.model.PulseLogStatus;
 import com.fleetpulse.api.domain.model.Unit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +38,7 @@ public class RoundManagementService implements ManageRoundUseCase {
     private final UnitRepository unitRepository;
     private final SendPulseUseCase sendPulseUseCase;
     private final GpsCoordinateProvider gpsProvider;
+    private final PulseLogRepository pulseLogRepository;
     private final Clock clock;
     private final long roundIntervalMs;
 
@@ -43,13 +47,15 @@ public class RoundManagementService implements ManageRoundUseCase {
     public RoundManagementService(UnitRepository unitRepository,
                                    SendPulseUseCase sendPulseUseCase,
                                    GpsCoordinateProvider gpsProvider,
+                                   PulseLogRepository pulseLogRepository,
                                    Clock clock,
                                    long roundIntervalMs) {
-        this.unitRepository   = Objects.requireNonNull(unitRepository,   "unitRepository must not be null");
-        this.sendPulseUseCase = Objects.requireNonNull(sendPulseUseCase, "sendPulseUseCase must not be null");
-        this.gpsProvider      = Objects.requireNonNull(gpsProvider,      "gpsProvider must not be null");
-        this.clock            = Objects.requireNonNull(clock,            "clock must not be null");
-        this.roundIntervalMs  = roundIntervalMs;
+        this.unitRepository     = Objects.requireNonNull(unitRepository,     "unitRepository must not be null");
+        this.sendPulseUseCase   = Objects.requireNonNull(sendPulseUseCase,   "sendPulseUseCase must not be null");
+        this.gpsProvider        = Objects.requireNonNull(gpsProvider,        "gpsProvider must not be null");
+        this.pulseLogRepository = Objects.requireNonNull(pulseLogRepository, "pulseLogRepository must not be null");
+        this.clock              = Objects.requireNonNull(clock,              "clock must not be null");
+        this.roundIntervalMs    = roundIntervalMs;
     }
 
     @Override
@@ -151,8 +157,19 @@ public class RoundManagementService implements ManageRoundUseCase {
                 log.info("ROUND_PULSE_SENT numUnidad={}", numUnidad);
 
             } catch (GpsProviderUnavailableException e) {
-                activeRounds.remove(numUnidad);
-                log.warn("ROUND_REMOVED_GPS_UNAVAILABLE numUnidad={}", numUnidad);
+                // Transient failure (GPS stale/missing) — skip this tick only, keep the round
+                // alive, and update ultimoEnvio so the next attempt waits the normal
+                // roundIntervalMs cadence instead of retrying every tick (ADR-019).
+                PulseLogStatus skipStatus = isStaleMessage(e)
+                        ? PulseLogStatus.SKIPPED_STALE
+                        : PulseLogStatus.SKIPPED_NO_COORDS;
+                pulseLogRepository.save(PulseLog.skipped(numUnidad, skipStatus, ZonedDateTime.now(clock)));
+
+                activeRounds.computeIfPresent(numUnidad,
+                        (k, v) -> new RoundState(v.horaInicio(), v.horaFin(),
+                                v.coordinateMode(), v.manualLat(), v.manualLon(), instant));
+
+                log.info("ROUND_TICK_SKIPPED numUnidad={} reason={}", numUnidad, skipStatus);
 
             } catch (UnitNotActiveException e) {
                 activeRounds.remove(numUnidad);
@@ -167,5 +184,14 @@ public class RoundManagementService implements ManageRoundUseCase {
     /** Exposed for testing — returns an unmodifiable view of active rounds. */
     public Map<String, RoundState> activeRounds() {
         return java.util.Collections.unmodifiableMap(activeRounds);
+    }
+
+    // Mirrors PulseOrchestrationService.isStaleMessage() — kept as a local, small duplication
+    // rather than a shared utility, since GpsProviderUnavailableException is also thrown by
+    // unrelated adapters (SOAP transport failures, manual-mode config) that don't fit a
+    // stale/no-data distinction (ADR-019 rejected a typed Reason field on that exception
+    // for exactly this reason — see ROADMAP.md Phase 6 Layer 11).
+    private boolean isStaleMessage(GpsProviderUnavailableException e) {
+        return e.getMessage() != null && e.getMessage().contains("stale");
     }
 }

@@ -1,4 +1,5 @@
 package com.fleetpulse.api.infrastructure.config;
+import com.fleetpulse.api.infrastructure.security.GpsIngestionRateLimitFilter;
 import com.fleetpulse.api.infrastructure.security.JwtAuthenticationFilter;
 import com.fleetpulse.api.infrastructure.security.LoginRateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,8 +12,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -29,15 +28,7 @@ public class SecurityConfig {
 
     @Value("${app.cors.allowed-origin}")
     private String allowedOrigin;
-    /**
-     * Encoder de passwords. Spring Security lo usa internamente
-     * cuando inyectamos AuthenticationManager o cuando comparamos
-     * passwords en cualquier adapter.
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder(){
-        return new BCryptPasswordEncoder();
-    }
+
     /**
      * Cadena de filtros de seguridad. Stateless, sin CSRF, con CORS
      * permisivo para desarrollo, y matriz de autorización basada en
@@ -47,7 +38,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter,
-            LoginRateLimitFilter loginRateLimitFilter) throws Exception {
+            LoginRateLimitFilter loginRateLimitFilter,
+            GpsIngestionRateLimitFilter gpsIngestionRateLimitFilter) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session ->
@@ -103,6 +95,7 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(loginRateLimitFilter, JwtAuthenticationFilter.class)
+                .addFilterBefore(gpsIngestionRateLimitFilter, JwtAuthenticationFilter.class)
                 .build();
     }
     @Bean
@@ -112,7 +105,11 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
-        configuration.setAllowCredentials(false);
+        // Required for the browser to send/receive the httpOnly refresh_token cookie
+        // cross-origin (dev mode: Vite on :5173, API on :8080). Do NOT add Set-Cookie to
+        // exposedHeaders — that only controls whether JS can read a response header, and
+        // JS must never read this cookie (that's the entire point of httpOnly).
+        configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

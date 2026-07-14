@@ -8,8 +8,6 @@ public record RefreshResponse(
 
         String accessToken,
 
-        String refreshToken,
-
         Instant expiresAt
 ) {
 
@@ -17,7 +15,6 @@ public record RefreshResponse(
 
         return new RefreshResponse(
                 result.accessToken(),
-                result.refreshToken(),
                 result.expiresAt()
         );
     }

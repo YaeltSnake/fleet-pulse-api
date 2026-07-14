@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!-- Justified suppressions go here. Each entry must include a reason comment and a review date. -->
+
+    <suppress>
+        <notes><![CDATA[
+            False positive. CVE-2025-7962 is an SMTP injection vulnerability in
+            org.eclipse.angus:angus-mail (Jakarta Mail), not angus-activation. angus-activation
+            only handles MIME type resolution/DataHandler — it has no SMTP or mail-sending code
+            path, so this CVE cannot apply to it. Confirmed as a known false positive against the
+            dependency-check project itself (issues #8144 and #8211 on
+            dependency-check/DependencyCheck). Pulled in transitively via jaxws-rt (JAX-WS Metro).
+            Review date: 2027-01-08 (re-check if a new angus-activation CVE is filed, or if
+            jaxws-rt drops the dependency).
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.eclipse\.angus/angus\-activation@.*$</packageUrl>
+        <cve>CVE-2025-7962</cve>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+            False positive. CVE-2026-2586 and CVE-2026-2587 are RCE vulnerabilities in the
+            GlassFish Administration Console (authenticated OS command execution) and the
+            GlassFish gadget handler's server-side template rendering (unescaped EL expressions
+            in XML). Both require a running GlassFish application server with its admin console —
+            this project has neither; it runs on Spring Boot's embedded Tomcat. jaxb-impl here is
+            only the JAXB runtime used by the JAX-WS Metro SOAP client (QSolutionsSoapAdapter),
+            not an application server. The CPE match (cpe:2.3:a:eclipse:glassfish) is a known
+            confusion between the jaxb-impl library artifact and the GlassFish product that used
+            to bundle it. Pulled in transitively via jaxws-rt.
+            Review date: 2027-01-08.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/com\.sun\.xml\.bind/jaxb\-impl@.*$</packageUrl>
+        <cve>CVE-2026-2586</cve>
+        <cve>CVE-2026-2587</cve>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+            False positive / already remediated. CVE-2026-42582 affects netty-codec-http3
+            (HTTP/3 codec module) — this project does not use HTTP/3 anywhere; Netty is pulled in
+            transitively via Lettuce (spring-boot-starter-data-redis), which only uses plain TCP.
+            The generic "netty:netty" CPE (cpe:2.3:a:netty:netty:4.1.135) does not distinguish
+            between Netty modules, so it attaches to whichever io.netty:* jar the analyzer happens
+            to process — observed on netty-transport in one run and netty-transport-native-unix-common
+            in another, neither of which contains the affected HTTP/3 codec. This suppression is
+            scoped to the whole io.netty group (not one artifact) so it survives that non-determinism.
+            Additionally, the CVE was fixed upstream in Netty 4.1.133.Final — we are already on
+            4.1.135.Final (later than the fix), so even if the affected module were present it
+            would not be vulnerable at this version.
+            Review date: 2027-01-08.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/.*@.*$</packageUrl>
+        <cve>CVE-2026-42582</cve>
+    </suppress>
+
+    <suppress>
+        <notes><![CDATA[
+            False positive. CVE-2026-34477/34478/34479/34480/34481 and CVE-2025-68161 are all in
+            log4j-core Layout implementation classes (Rfc5424Layout, XmlLayout, Log4j1XmlLayout,
+            JsonTemplateLayout) — none of which exist in log4j-api, which only contains the
+            logging facade (Logger, LogManager, Level, Marker). Confirmed via
+            `mvn dependency:tree -Dincludes=org.apache.logging.log4j` (2026-07-08): log4j-api is
+            pulled in transitively as spring-boot-starter-logging -> log4j-to-slf4j -> log4j-api,
+            a bridge that redirects Log4j2 API calls into SLF4J/Logback (our actual logging
+            implementation). log4j-core is absent from the dependency tree entirely, so the
+            vulnerable Layout classes cannot be on the classpath regardless of the log4j-api
+            version. The generic "apache:log4j" CPE does not distinguish api from core.
+            Review date: 2027-01-08 (re-check if any dependency ever pulls in log4j-core directly).
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/log4j\-api@.*$</packageUrl>
+        <cve>CVE-2026-34477</cve>
+        <cve>CVE-2026-34478</cve>
+        <cve>CVE-2026-34479</cve>
+        <cve>CVE-2026-34480</cve>
+        <cve>CVE-2026-34481</cve>
+        <cve>CVE-2025-68161</cve>
+    </suppress>
+</suppressions>

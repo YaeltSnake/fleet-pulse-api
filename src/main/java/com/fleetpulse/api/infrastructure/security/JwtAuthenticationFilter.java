@@ -3,6 +3,10 @@ package com.fleetpulse.api.infrastructure.security;
 import com.fleetpulse.api.application.port.out.TokenBlacklist;
 import com.fleetpulse.api.application.port.out.TokenService;
 import com.fleetpulse.api.domain.exception.ExternalServiceUnavailableException;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
+import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,7 +51,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!tokenService.isTokenValid(jwt)) {
+        TokenService.TokenClaims claims;
+        try {
+            claims = tokenService.parseToken(jwt);
+        } catch (ExpiredJwtException | SignatureException | MalformedJwtException
+                | UnsupportedJwtException | IllegalArgumentException e) {
             SecurityContextHolder.clearContext();
 
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid, expired token");
@@ -71,16 +79,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-
-
-        Long userId = tokenService.extractUserId(jwt);
-        String role = tokenService.extractRole(jwt);
-
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(
-                        userId,
+                        claims.userId(),
                         null,
-                        List.of(new SimpleGrantedAuthority(role))
+                        List.of(new SimpleGrantedAuthority(claims.role()))
                 );
 
         authentication.setDetails(

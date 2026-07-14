@@ -8,10 +8,10 @@ import com.fleetpulse.api.domain.exception.*;
 import com.fleetpulse.api.domain.model.RefreshToken;
 import com.fleetpulse.api.domain.model.Role;
 import com.fleetpulse.api.domain.model.User;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -32,8 +32,16 @@ class AuthServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
 
-    @InjectMocks
+    // DUMMY_HASH is hardcoded at cost factor 10 — the constructor guard requires an exact match.
+    private static final int MATCHING_BCRYPT_STRENGTH = 10;
+
     private AuthService authService;
+
+    @BeforeEach
+    void setUp() {
+        authService = new AuthService(passwordHasher, tokenBlacklist, tokenService,
+                userRepository, refreshTokenRepository, MATCHING_BCRYPT_STRENGTH);
+    }
 
     @Test
     void login_withValidCredentials_returnsAuthResultWithTokens() {
@@ -57,6 +65,25 @@ class AuthServiceTest {
         verify(passwordHasher).matches("password", "hash");
         verify(refreshTokenRepository).revokeAllByUserId(1L);
         verify(refreshTokenRepository).save(any(RefreshToken.class));
+    }
+
+    // ==================== constructor guard: DUMMY_HASH vs bcryptStrength ====================
+
+    @Test
+    void constructor_withStrengthMatchingDummyHash_constructsSuccessfully() {
+        // Act + Assert — no exception means the guard accepted the matching strength
+        assertThatNoException().isThrownBy(() -> new AuthService(passwordHasher, tokenBlacklist,
+                tokenService, userRepository, refreshTokenRepository, MATCHING_BCRYPT_STRENGTH));
+    }
+
+    @Test
+    void constructor_withStrengthNotMatchingDummyHash_throwsIllegalStateException() {
+        // Act + Assert — DUMMY_HASH is hardcoded at cost factor 10; 12 must be rejected
+        assertThatThrownBy(() -> new AuthService(passwordHasher, tokenBlacklist,
+                tokenService, userRepository, refreshTokenRepository, 12))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("app.security.bcrypt-strength")
+                .hasMessageContaining("DUMMY_HASH");
     }
 
     @Test
@@ -309,6 +336,27 @@ class AuthServiceTest {
         // Assert
         verify(tokenBlacklist, never()).blacklist(any(), any());
         verify(refreshTokenRepository).revokeByToken("refresh-token");
+    }
+
+    // Phase 7 Layer 2 — multi-tab case: refresh_token cookie already cleared in another tab,
+    // but this tab's access token is still live and must be blacklisted regardless. Extends
+    // the "full logout regardless" behavior from FIXME-LOGOUT-REFRESH (Phase 6 L1) to a null
+    // refreshToken instead of just an expired one.
+    @Test
+    void logout_withNullRefreshToken_stillBlacklistsAccessTokenWithoutCallingRevoke() {
+        // Arrange
+        String accessToken = "access-token";
+        Duration remaining = Duration.ofMinutes(10);
+        when(tokenService.remainingTtl(accessToken)).thenReturn(remaining);
+
+        // Act
+        authService.logout(accessToken, null);
+
+        // Assert
+        verify(tokenBlacklist).blacklist(accessToken, remaining);
+        verify(refreshTokenRepository, never()).revokeByToken(any());
+        verify(refreshTokenRepository, never()).findByToken(any());
+        verify(tokenService, never()).extractUserId(any());
     }
 }
 

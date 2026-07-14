@@ -107,6 +107,26 @@ public class JwtService implements TokenService {
 
     }
 
+    @Override
+    public TokenClaims parseToken(String token) {
+        Claims claims = extractAllClaims(token);
+
+        Long userId;
+        try {
+            userId = Long.valueOf(claims.getSubject());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid userId format in token: " + claims.getSubject());
+        }
+
+        String role = claims.get("role", String.class);
+
+        Instant expiration = claims.getExpiration().toInstant();
+        Instant now = Instant.now();
+        Duration remainingTtl = expiration.isBefore(now) ? Duration.ZERO : Duration.between(now, expiration);
+
+        return new TokenClaims(userId, role, remainingTtl);
+    }
+
     private Claims extractAllClaims(String token){
         return Jwts.parser()
                 .verifyWith(this.signingKey)

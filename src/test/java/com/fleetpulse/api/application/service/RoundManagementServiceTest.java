@@ -2,6 +2,7 @@ package com.fleetpulse.api.application.service;
 
 import com.fleetpulse.api.application.port.in.SendPulseUseCase;
 import com.fleetpulse.api.application.port.out.GpsCoordinateProvider;
+import com.fleetpulse.api.application.port.out.PulseLogRepository;
 import com.fleetpulse.api.application.port.out.UnitRepository;
 import com.fleetpulse.api.domain.exception.GpsProviderUnavailableException;
 import com.fleetpulse.api.domain.exception.InvalidCoordinateException;
@@ -11,10 +12,13 @@ import com.fleetpulse.api.domain.exception.ScheduleNotConfiguredException;
 import com.fleetpulse.api.domain.exception.UnitNotActiveException;
 import com.fleetpulse.api.domain.exception.UnitNotFoundException;
 import com.fleetpulse.api.domain.model.CoordinateMode;
+import com.fleetpulse.api.domain.model.PulseLog;
+import com.fleetpulse.api.domain.model.PulseLogStatus;
 import com.fleetpulse.api.domain.model.Unit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -55,13 +59,14 @@ class RoundManagementServiceTest {
     @Mock private UnitRepository unitRepository;
     @Mock private SendPulseUseCase sendPulseUseCase;
     @Mock private GpsCoordinateProvider gpsProvider;
+    @Mock private PulseLogRepository pulseLogRepository;
 
     private RoundManagementService service;
 
     @BeforeEach
     void setUp() {
         service = new RoundManagementService(
-                unitRepository, sendPulseUseCase, gpsProvider, CLOCK_AT_10AM, ROUND_INTERVAL_MS);
+                unitRepository, sendPulseUseCase, gpsProvider, pulseLogRepository, CLOCK_AT_10AM, ROUND_INTERVAL_MS);
     }
 
     // ── startRound() validation chain ─────────────────────────────────────────
@@ -265,7 +270,7 @@ class RoundManagementServiceTest {
     @Test
     void processTick_withUnitOutsideWindow_doesNotDispatch() {
         RoundManagementService serviceAt8 = new RoundManagementService(
-                unitRepository, sendPulseUseCase, gpsProvider, CLOCK_AT_8AM, ROUND_INTERVAL_MS);
+                unitRepository, sendPulseUseCase, gpsProvider, pulseLogRepository, CLOCK_AT_8AM, ROUND_INTERVAL_MS);
         Unit unitWithWindow = unit("Peugeot", true, LocalTime.of(9, 0), LocalTime.of(17, 0));
         when(unitRepository.findByNumUnidad("Peugeot")).thenReturn(Optional.of(unitWithWindow));
         serviceAt8.startRound("Peugeot", CoordinateMode.MANUAL, LAT, LON);
@@ -289,19 +294,69 @@ class RoundManagementServiceTest {
         verify(sendPulseUseCase, times(1)).dispatch(any(), any());
     }
 
-    // 9.4.21
+    // 9.4.21 — ADR-019: GPS unavailable (stale) is a TRANSIENT failure — skip this tick only,
+    // write a pulse_log entry, and keep the round active. Renamed from
+    // "...removesRoundFromMap" — that was the pre-ADR-019 behavior, now intentionally changed.
     @Test
-    void processTick_onGpsProviderUnavailableException_removesRoundFromMap() {
+    void processTick_onStaleGpsException_skipsTickWritesPulseLogAndKeepsRoundActive() {
         when(unitRepository.findByNumUnidad("Peugeot"))
                 .thenReturn(Optional.of(activeUnit("Peugeot")));
         service.startRound("Peugeot", CoordinateMode.MANUAL, LAT, LON);
 
-        doThrow(new GpsProviderUnavailableException("SOAP failure"))
+        // In real production this exception comes from gpsProvider.getCoordinates() in
+        // AUTOMATIC mode (see TraccarCoordinateAdapter); mocking dispatch() to throw it here
+        // isolates the processTick() catch-block behavior regardless of coordinateMode.
+        doThrow(new GpsProviderUnavailableException("GPS data is stale (> max age) for unit: Peugeot"))
                 .when(sendPulseUseCase).dispatch(any(), any());
 
         service.processTick();
 
-        assertThat(service.activeRounds()).doesNotContainKey("Peugeot");
+        // The round survives — this is the entire point of ADR-019
+        assertThat(service.activeRounds()).containsKey("Peugeot");
+
+        ArgumentCaptor<PulseLog> captor = ArgumentCaptor.forClass(PulseLog.class);
+        verify(pulseLogRepository).save(captor.capture());
+        assertThat(captor.getValue().numUnidad()).isEqualTo("Peugeot");
+        assertThat(captor.getValue().status()).isEqualTo(PulseLogStatus.SKIPPED_STALE);
+    }
+
+    // 9.4.21b — same catch block, but a "no data yet" message maps to SKIPPED_NO_COORDS
+    // instead of SKIPPED_STALE (mirrors PulseOrchestrationService's existing distinction).
+    @Test
+    void processTick_onMissingGpsException_writesPulseLogWithSkippedNoCoordsStatus() {
+        when(unitRepository.findByNumUnidad("Peugeot"))
+                .thenReturn(Optional.of(activeUnit("Peugeot")));
+        service.startRound("Peugeot", CoordinateMode.MANUAL, LAT, LON);
+
+        doThrow(new GpsProviderUnavailableException("No GPS data received yet for unit: Peugeot"))
+                .when(sendPulseUseCase).dispatch(any(), any());
+
+        service.processTick();
+
+        assertThat(service.activeRounds()).containsKey("Peugeot");
+
+        ArgumentCaptor<PulseLog> captor = ArgumentCaptor.forClass(PulseLog.class);
+        verify(pulseLogRepository).save(captor.capture());
+        assertThat(captor.getValue().status()).isEqualTo(PulseLogStatus.SKIPPED_NO_COORDS);
+    }
+
+    // 9.4.21c — retry-cadence regression guard (ADR-019): ultimoEnvio MUST update even on a
+    // skipped tick. Otherwise the next tick (every scheduler.round.tick-ms, default 30s) would
+    // retry immediately instead of waiting the full roundIntervalMs — turning one stale reading
+    // into a 30-second retry storm instead of the normal 15-minute cadence.
+    @Test
+    void processTick_onStaleGpsException_stillUpdatesUltimoEnvioToPreventRetryStorm() {
+        when(unitRepository.findByNumUnidad("Peugeot"))
+                .thenReturn(Optional.of(activeUnit("Peugeot")));
+        service.startRound("Peugeot", CoordinateMode.MANUAL, LAT, LON);
+        assertThat(service.activeRounds().get("Peugeot").ultimoEnvio()).isNull();
+
+        doThrow(new GpsProviderUnavailableException("GPS data is stale (> max age) for unit: Peugeot"))
+                .when(sendPulseUseCase).dispatch(any(), any());
+
+        service.processTick();
+
+        assertThat(service.activeRounds().get("Peugeot").ultimoEnvio()).isNotNull();
     }
 
     // 9.4.22
@@ -335,7 +390,9 @@ class RoundManagementServiceTest {
         assertThat(service.activeRounds()).containsKey("Peugeot");
     }
 
-    // 9.4.24
+    // 9.4.24 — updated for ADR-019: a GPS failure on one unit no longer removes its round.
+    // Kangoo now behaves like a skip (stays active, pulse_log entry) instead of a removal —
+    // per-unit isolation still holds (Peugeot is completely unaffected either way).
     @Test
     void processTick_withMultipleUnits_processesAllAndDoesNotAbortOnOneFailure() {
         Unit peugeot = unit("Peugeot", true, LocalTime.of(9, 0), LocalTime.of(17, 0));
@@ -346,7 +403,7 @@ class RoundManagementServiceTest {
         service.startRound("Peugeot", CoordinateMode.MANUAL, LAT, LON);
         service.startRound("Kangoo",  CoordinateMode.MANUAL, LAT, LON);
 
-        doThrow(new GpsProviderUnavailableException("GPS down"))
+        doThrow(new GpsProviderUnavailableException("GPS data is stale (> max age) for unit: Kangoo"))
                 .when(sendPulseUseCase).dispatch(eq("Kangoo"), any());
 
         service.processTick();
@@ -355,9 +412,16 @@ class RoundManagementServiceTest {
         verify(sendPulseUseCase).dispatch(eq("Peugeot"), any());
         verify(sendPulseUseCase).dispatch(eq("Kangoo"), any());
 
-        // Peugeot succeeds and remains in activeRounds; Kangoo is removed
+        // Peugeot succeeds and remains active; Kangoo is SKIPPED (not removed) — both stay active
         assertThat(service.activeRounds()).containsKey("Peugeot");
-        assertThat(service.activeRounds()).doesNotContainKey("Kangoo");
+        assertThat(service.activeRounds()).containsKey("Kangoo");
+
+        // Only Kangoo's failure produces a pulse_log entry — Peugeot's success path doesn't
+        // touch pulseLogRepository at this layer (that write belongs to PulseOrchestrationService)
+        ArgumentCaptor<PulseLog> captor = ArgumentCaptor.forClass(PulseLog.class);
+        verify(pulseLogRepository).save(captor.capture());
+        assertThat(captor.getValue().numUnidad()).isEqualTo("Kangoo");
+        assertThat(captor.getValue().status()).isEqualTo(PulseLogStatus.SKIPPED_STALE);
     }
 
     // 9.4.25 — extra case: first tick on a new round (ultimoEnvio == null) skips cooldown gate

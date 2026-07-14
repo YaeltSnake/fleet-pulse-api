@@ -14,6 +14,7 @@ import com.fleetpulse.api.infrastructure.adapter.out.cache.GpsPositionCache;
 import com.fleetpulse.api.infrastructure.adapter.out.soap.QSolutionsSoapAdapter;
 import com.fleetpulse.api.infrastructure.init.AdminUserInitializer;
 import com.fleetpulse.api.infrastructure.security.BcryptPasswordHasherAdapter;
+import com.fleetpulse.api.infrastructure.security.GpsIngestionRateLimitFilter;
 import com.fleetpulse.api.infrastructure.security.JwtAuthenticationFilter;
 import com.fleetpulse.api.infrastructure.security.JwtService;
 import com.fleetpulse.api.infrastructure.security.LoginRateLimitFilter;
@@ -22,15 +23,27 @@ import jakarta.xml.ws.BindingProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.tempuri.ReceiveGPSInfo;
 import org.tempuri.ReceiveGPSInfoSoap;
 
 import java.net.URL;
 import java.time.Clock;
+import java.time.Duration;
 
 @Configuration
 public class ApplicationConfig {
+
+    /**
+     * Encoder de passwords. Strength configurable via app.security.bcrypt-strength
+     * (BCRYPT_STRENGTH env var) — AuthService fails fast at startup if this drifts from
+     * the cost factor embedded in its DUMMY_HASH constant (ASVS V2.7.1 timing defense).
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder(@Value("${app.security.bcrypt-strength}") int bcryptStrength){
+        return new BCryptPasswordEncoder(bcryptStrength);
+    }
 
     @Bean
     public PasswordHasher passwordHasher(PasswordEncoder passwordEncoder){
@@ -54,6 +67,13 @@ public class ApplicationConfig {
     }
 
     @Bean
+    public GpsIngestionRateLimitFilter gpsIngestionRateLimitFilter(
+            @Value("${app.rate-limit.gps.max-pushes-per-window:1}") int maxPushesPerWindow,
+            @Value("${app.rate-limit.gps.window-seconds:10}") long windowSeconds) {
+        return new GpsIngestionRateLimitFilter(maxPushesPerWindow, Duration.ofSeconds(windowSeconds));
+    }
+
+    @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(TokenService tokenService, TokenBlacklist tokenBlacklist){
         return new JwtAuthenticationFilter(tokenService, tokenBlacklist);
     }
@@ -69,10 +89,12 @@ public class ApplicationConfig {
             TokenBlacklist tokenBlacklist,
             TokenService tokenService,
             UserRepository userRepository,
-            RefreshTokenRepository refreshTokenRepository
+            RefreshTokenRepository refreshTokenRepository,
+            @Value("${app.security.bcrypt-strength}") int bcryptStrength
             )
     {
-        return new AuthService(passwordHasher, tokenBlacklist, tokenService, userRepository, refreshTokenRepository);
+        return new AuthService(passwordHasher, tokenBlacklist, tokenService, userRepository,
+                refreshTokenRepository, bcryptStrength);
     }
 
     @Bean
@@ -166,9 +188,11 @@ public class ApplicationConfig {
             UnitRepository unitRepository,
             SendPulseUseCase sendPulseUseCase,
             GpsCoordinateProvider gpsProvider,
+            PulseLogRepository pulseLogRepository,
             Clock clock,
             @Value("${scheduler.round.interval-ms}") long roundIntervalMs) {
-        return new RoundManagementService(unitRepository, sendPulseUseCase, gpsProvider, clock, roundIntervalMs);
+        return new RoundManagementService(unitRepository, sendPulseUseCase, gpsProvider,
+                pulseLogRepository, clock, roundIntervalMs);
     }
 
 }

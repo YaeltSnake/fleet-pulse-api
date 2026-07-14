@@ -16,7 +16,9 @@
 | 4 | `v0.4.0` | Pre-release | Dispatch engine + API contract freeze |
 | 5 | `v1.0.0` | **Full release** | Production replacement |
 | 6 | `v1.1.0` | **Full release** | Real-time GPS (Traccar) + technical debt resolved + pulse log |
-| 7 | `v2.0.0` | Full release | React frontend shipped |
+| 7 | `v1.2.0` | Full release | Auth hardening — httpOnly refresh cookie, single-parse JWT filter, dependency scanning |
+| 8 | `v1.3.0` | Full release | Pre-frontend readiness — API contract freeze, full endpoint audit, end-to-end smoke suite |
+| 9 | `v2.0.0` | Full release | React frontend shipped, screen by screen |
 
 ---
 
@@ -3436,7 +3438,7 @@ git push origin v1.0.0
 **Tag:** `v1.1.0` ✅
 **Exit condition:** (1) All MEDIUM/HIGH technical debt from Phase 5 resolved (FIXME-Q8, FIXME-MULTI-SESSION, FIXME-LOGOUT-REFRESH, FIXME-TIMING, FIXME-CORS). (2) `TraccarPositionController` receives OsmAnd GET and Traccar Client POST pushes, stores in `GpsPositionCache` keyed by `numUnidad`. (3) `TraccarCoordinateAdapter` replaces `ManualCoordinateAdapter` as the active GPS provider. (4) `SKIPPED_STALE` logged when a coordinate is older than 300 s. (5) `pulse_log` table in DB, written after each dispatch outcome. (6) `GET /api/pulse-log` paginated and filterable. (7) `coordinateMode=AUTOMATIC` guard removed from `PulseController`. (8) Real Traccar Client coordinate confirmed in at least one `PULSE_SENT` event. (9) 263 tests passing, 0 failures, 0 ArchUnit violations. ✅
 
-> **GPS Design Decision (ADR-018):** The OsmAnd push `id` field maps directly to `numUnidad`. Operators configure Traccar Client with the exact unit identifier (e.g. `Peugeot`). No additional mapping table. When real hardware GPS arrives via SMS, it will use the same endpoint with no server-side changes — only the push source changes.
+> **GPS Design Decision (informal, not a numbered ADR):** The OsmAnd push `id` field maps directly to `numUnidad`. Operators configure Traccar Client with the exact unit identifier (e.g. `Peugeot`). No additional mapping table. When real hardware GPS arrives via SMS, it will use the same endpoint with no server-side changes — only the push source changes.
 >
 > **Mandatory order:** Layers 1–4 resolve technical debt and must be completed before introducing new features. No new feature ships with active MEDIUM debt on top of it.
 
@@ -3614,7 +3616,7 @@ Exit condition: CORS configuration reads origin from env var. `application.prope
 
 ---
 
-### Layer 3 — Technical Debt: Cosmetic + Validation ✅ (FIXME-PERF deferred to Phase 7)
+### Layer 3 — Technical Debt: Cosmetic + Validation ✅ (FIXME-PERF resolved 2026-07-07)
 
 > Can run in parallel with Layer 2. Surgical changes with no regression risk.
 
@@ -3656,7 +3658,7 @@ if (!request.horaInicio().isBefore(request.horaFin())) {
 
 ---
 
-#### 3.3 — FIXME-PERF: Eliminate triple JWT parse per request (deferred to Phase 7)
+#### 3.3 — FIXME-PERF: Eliminate triple JWT parse per request (RESOLVED 2026-07-07)
 
 **Problem:** `JwtAuthenticationFilter` calls `isTokenValid()`, `extractUserId()`, and `extractRole()` — three parses of the same JWT per request.
 
@@ -3681,20 +3683,20 @@ TokenClaims parseToken(String token);
 
 | Status | Task |
 |---|---|
-| ⬜ | Add `record TokenClaims(Long userId, String role, Duration remainingTtl)` in `TokenService.java` |
-| ⬜ | Add `TokenClaims parseToken(String token)` to the `TokenService` port |
-| ⬜ | Implement `parseToken()` in `JwtService.java` |
-| ⬜ | Refactor `JwtAuthenticationFilter` to use `parseToken()` — one parse per request |
-| ⬜ | Remove `FIXME-PERF` from `TokenService.java` |
-| ⬜ | `mvn test` — 263+ passing, 0 failures |
+| ✅ | Add `record TokenClaims(Long userId, String role, Duration remainingTtl)` in `TokenService.java` |
+| ✅ | Add `TokenClaims parseToken(String token)` to the `TokenService` port |
+| ✅ | Implement `parseToken()` in `JwtService.java` |
+| ✅ | Refactor `JwtAuthenticationFilter` to use `parseToken()` — one parse per request |
+| ✅ | Remove `FIXME-PERF` comment block from `TokenService.java` |
+| ✅ | `mvn test` — 268 passing, 0 failures, 0 errors, 2 skipped (2026-07-07) |
 
-Exit condition: `JwtAuthenticationFilter` calls `tokenService.parseToken()` once per request. Existing filter tests remain green.
+Exit condition: `JwtAuthenticationFilter` calls `tokenService.parseToken()` once per request. Existing filter tests remain green. **RESOLVED 2026-07-07.**
 
 ---
 
-### Layer 4 — Technical Debt: Supply Chain + BCrypt
+### Layer 4 — Technical Debt: Supply Chain + BCrypt ✅ (RESOLVED 2026-07-08)
 
-#### 4.1 — FIXME-Q6: dependency-check-maven
+#### 4.1 — FIXME-Q6: dependency-check-maven (RESOLVED 2026-07-08)
 
 **File to modify:** `pom.xml`
 
@@ -3721,11 +3723,11 @@ Create `.dependency-check-suppressions.xml` empty file at project root (for futu
 
 | Status | Task |
 |---|---|
-| ⬜ | Add `dependency-check-maven` plugin to `pom.xml` (`verify` phase) |
-| ⬜ | Create empty `.dependency-check-suppressions.xml` at project root |
-| ⬜ | Add `.dependency-check-suppressions.xml` to `.gitignore` if it contains local paths |
-| ⬜ | Run `mvn dependency-check:check` — confirm 0 HIGH/CRITICAL CVEs without suppression |
-| ⬜ | Remove `FIXME-Q6` from `pom.xml` |
+| ✅ | Add `dependency-check-maven` plugin to `pom.xml` (`verify` phase) — also added `nvdApiKeyEnvironmentVariable=NVD_API_KEY` and `ossindexAnalyzerEnabled=false` (Sonatype OSS Index needs separate, unconfigured credentials — NVD is our sole source) |
+| ✅ | Create `.dependency-check-suppressions.xml` at project root — no local paths, not added to `.gitignore` |
+| — | (superseded — file has real content, not empty; see suppressions below) |
+| ✅ | Run `mvn dependency-check:check` — **BUILD SUCCESS 2026-07-08.** 0 CVEs with CVSS ≥ 7.0 unsuppressed. Required: bump `spring-boot-starter-parent` 3.5.14→3.5.16 (last 3.5.x OSS release), bump `jaxws-rt` 4.0.2→4.0.5, override `tomcat.version=10.1.56` property (fixes CVE-2026-53434/55276/53404), and 3 justified suppressions for confirmed false positives — `angus-activation` (CVE-2025-7962, real CVE is in angus-mail/SMTP, not activation), `jaxb-impl` (CVE-2026-2586/2587, real CVEs are GlassFish admin-console RCEs, we run embedded Tomcat not GlassFish), `log4j-api` + all `io.netty:*` (CVE-2026-34477/78/79/80/81 are in log4j-**core** Layout classes, absent from our tree — confirmed via `mvn dependency:tree`; CVE-2026-42582 is in netty-codec-http3, unused, and already fixed in the Netty version we carry). Remaining low-severity findings (`commons-lang3`, `hibernate-validator`, `jackson-databind`, swagger-ui's bundled DOMPurify) are all below CVSS 7.0 — informational only, not blocking. |
+| ✅ | Remove `FIXME-Q6` marker — plugin fully wired, `mvn verify`/`dependency-check:check` green |
 
 ---
 
@@ -3756,12 +3758,13 @@ public PasswordEncoder passwordEncoder(@Value("${app.security.bcrypt-strength}")
 |---|---|
 | ✅ | Confirm BCrypt cost factor 10 matches `DUMMY_HASH` — documented in `application-prod.properties` |
 | ✅ | Remove `FIXME-TIMING` comment from `AuthService.java` |
-| ⬜ | Add `app.security.bcrypt-strength` to `application.properties` |
-| ⬜ | Add `BCRYPT_STRENGTH=10` to `.env.example` |
-| ⬜ | Move `@Bean PasswordEncoder` from `SecurityConfig` to `ApplicationConfig` with `@Value("${app.security.bcrypt-strength}")` |
-| ⬜ | Remove `@Bean PasswordEncoder` from `SecurityConfig` |
-| ⬜ | Update `DUMMY_HASH` comment in `AuthService` — indicate it must match `BCRYPT_STRENGTH` |
-| ⬜ | `mvn test` — 263+ passing, 0 failures |
+| ✅ | Add `app.security.bcrypt-strength=${BCRYPT_STRENGTH:10}` to `application.properties` |
+| ✅ | Add `BCRYPT_STRENGTH=10` to `.env.example` |
+| ✅ | Move `@Bean PasswordEncoder` from `SecurityConfig` to `ApplicationConfig` with `@Value("${app.security.bcrypt-strength}")` |
+| ✅ | Remove `@Bean PasswordEncoder` from `SecurityConfig` (+ removed orphaned `BCryptPasswordEncoder`/`PasswordEncoder` imports) |
+| ✅ | Update `DUMMY_HASH` comment in `AuthService` — indicate it must match `BCRYPT_STRENGTH` |
+| ✅ | **Beyond original scope (security audit finding, user-approved):** added a fail-fast constructor guard in `AuthService` — parses the cost factor embedded in `DUMMY_HASH` and throws `IllegalStateException` at startup if it doesn't match the injected `bcryptStrength`. Prevents a silent ASVS V2.7.1 timing-defense regression if `BCRYPT_STRENGTH` is ever changed without regenerating `DUMMY_HASH`. Same fail-fast pattern as `AdminUserInitializer`. 2 new tests (`constructor_withStrengthMatchingDummyHash_constructsSuccessfully`, `constructor_withStrengthNotMatchingDummyHash_throwsIllegalStateException`). `AuthServiceTest` switched from `@InjectMocks` to manual `@BeforeEach` construction (same reason as `AdminUserInitializerTest` — non-mock primitive constructor param). |
+| ✅ | `mvn test` — 270 passing, 0 failures, 0 errors, 2 skipped (2026-07-08) |
 
 Exit condition: BCrypt strength is configurable via env var. `ApplicationConfig` is the sole `PasswordEncoder @Bean` declaration. `SecurityConfig` has no business beans.
 
@@ -4367,31 +4370,389 @@ Exit condition: All test classes compile and pass. `mvn test` is clean. Test cou
 
 ---
 
+### Layer 11 — Round Resilience: Transient GPS Loss No Longer Kills the Round (✅ RESOLVED — code 2026-07-10, real-hardware smoke test 2026-07-11)
+
+**Discovered:** 2026-07-10, during Layer 10 manual smoke testing with real Traccar Client hardware (Peugeot + ngrok tunnel). Attempting to reproduce Step C (`SKIPPED_STALE`) revealed that the roadmap's Step C spec describes behavior from `PulseOrchestrationService.sendPulse()` — a method only ever called by `PulseSchedulerService`, which is **disabled by default** (`scheduler.pulse.global-enabled=false`) and is not the dispatch mechanism this project actually runs in production (round scheduling is). The real round-tick path (`RoundManagementService.processTick()`) had a materially different, untested-against-real-hardware behavior: **any** `GpsProviderUnavailableException` (stale OR missing coordinate) removed the round from `activeRounds` entirely — same treatment as `UnitNotActiveException` (unit deactivated by an ADMIN). This is confirmed intentional, pre-existing, tested behavior (`RoundManagementServiceTest` 9.4.21, 9.4.22, 9.4.24) — not a regression.
+
+**Problem this causes in real operation:** a transient GPS gap (tunnel, dead zone, OS briefly killing background location) permanently stops automatic dispatch for that unit — round scheduling requires a human to notice and call `POST /round/start` again. At fleet scale this is expected to happen routinely, not as a rare edge case, and erodes trust in unattended automation. It also means the round path has **zero audit trail** in `pulse_log` when GPS fails — unlike `sendPulse()`, which already logs `SKIPPED_STALE`/`SKIPPED_NO_COORDS`.
+
+**Decision:** `GpsProviderUnavailableException` (transient — GPS hardware/connectivity issue) and `UnitNotActiveException` (deliberate operator action — ADMIN deactivated the unit) are fundamentally different failure classes and must be handled differently:
+- `GpsProviderUnavailableException` → **skip this tick only**, keep the round active, write a `pulse_log` entry (`SKIPPED_STALE` or `SKIPPED_NO_COORDS`, same distinction `sendPulse()` already makes), retry on the normal cadence.
+- `UnitNotActiveException` → **unchanged.** Still removes the round immediately — deactivation is explicit and permanent until an ADMIN reactivates, there is nothing to "wait out."
+
+**Root cause location:** `RoundManagementService.processTick()` line ~141 calls `gpsProvider.getCoordinates(numUnidad)` directly (not inside `dispatch()`) — the exception originates here, so the fix is fully contained to this class plus its dependency wiring. No change needed in `PulseController`, `PulseOrchestrationService.dispatch()`, or `TraccarCoordinateAdapter`.
+
+**Rejected alternative (scope control):** redesigning `GpsProviderUnavailableException` with a typed `Reason` field (replacing the existing `e.getMessage().contains("stale")` string-sniffing in `PulseOrchestrationService.isStaleMessage()`) was considered and **rejected** — this exception class is shared by `QSolutionsSoapAdapter` (SOAP transport failure), `ManualCoordinateAdapter`, and `ProviderTestService`, none of which fit a stale/no-data `Reason` enum. Redesigning it would touch unrelated code far outside this fix's scope. `RoundManagementService` gets its own small `isStaleMessage()` helper mirroring `PulseOrchestrationService`'s existing (already-accepted) pattern instead.
+
+**Retry-cadence detail (must not regress):** on a stale/skip outcome, `ultimoEnvio` in `RoundState` **must still be updated to the current tick's instant**, exactly like the success path. If left unchanged, the next tick (every `scheduler.round.tick-ms`, default 30s) would immediately retry `getCoordinates()` instead of waiting the normal `scheduler.round.interval-ms` (default 15 min) — turning a single stale reading into a 30-second retry storm instead of a normal-cadence retry.
+
+#### Files to change
+
+| File | Change |
+|---|---|
+| `application/service/RoundManagementService.java` | Add `PulseLogRepository` constructor dependency. Add private `isStaleMessage(GpsProviderUnavailableException)` (mirrors `PulseOrchestrationService`). Rewrite the `catch (GpsProviderUnavailableException e)` block in `processTick()`: remove `activeRounds.remove(numUnidad)`; instead update `ultimoEnvio` (same as success path), write `pulseLogRepository.save(PulseLog.skipped(numUnidad, skipStatus, now))`, log at `INFO` (matches `sendPulse()`'s level, not `WARN` — this becomes a routine/expected event, not an anomaly). `catch (UnitNotActiveException e)` block: **unchanged.** |
+| `infrastructure/config/ApplicationConfig.java` | `roundManagementService(...)` bean gains a `PulseLogRepository` parameter, passed through to the constructor. |
+| `test/.../RoundManagementServiceTest.java` | Add `@Mock PulseLogRepository pulseLogRepository`; update `setUp()` constructor call. Rewrite test 9.4.21 → round stays active, `pulse_log` gets `SKIPPED_STALE` entry (or split into two tests: stale-message vs no-data-message, mirroring `PulseOrchestrationServiceTest`'s existing coverage style). Update test 9.4.24 → Kangoo (GPS failure) must now **stay** in `activeRounds`, not be removed; add assertion that `pulseLogRepository.save(...)` was called for Kangoo. Add a new test confirming `ultimoEnvio` is updated on a skipped tick (retry-cadence regression guard). Test 9.4.22 (`UnitNotActiveException` → round removed) stays as-is, unchanged. |
+| `CLAUDE.md` | New ADR documenting this decision (transient vs. permanent failure handling in round scheduling) and why it differs from `sendPulse()`'s legacy/unused global-scheduler behavior. |
+
+#### Checklist
+
+| Status | Task |
+|---|---|
+| ✅ | Add `PulseLogRepository` to `RoundManagementService` constructor |
+| ✅ | Add `isStaleMessage()` private helper to `RoundManagementService` |
+| ✅ | Rewrite `GpsProviderUnavailableException` catch block in `processTick()` — skip + log + pulse_log write + update `ultimoEnvio`, do NOT remove the round |
+| ✅ | Confirm `UnitNotActiveException` catch block is untouched |
+| ✅ | Update `ApplicationConfig.roundManagementService()` bean to inject `PulseLogRepository` |
+| ✅ | Update `RoundManagementServiceTest` — new mock, rewritten 9.4.21 (+9.4.21b, +9.4.21c), updated 9.4.24 |
+| ✅ | Add ADR-019 to `CLAUDE.md` documenting transient-vs-permanent failure handling in round scheduling |
+| ✅ | `mvn test` — 278 passing, 0 failures, 0 errors, 2 skipped, 0 ArchUnit violations (2026-07-10) |
+| ✅ | Manual smoke test (real Peugeot phone, 2026-07-11): airplane mode → 3× `ROUND_TICK_SKIPPED reason=SKIPPED_STALE` logged at the exact configured cadence (2 min, confirms the retry-storm guard works) → zero `ROUND_REMOVED_GPS_UNAVAILABLE` → round never re-started → 3 `pulse_log` rows confirmed via `GET /api/pulse-log?status=SKIPPED_STALE` → GPS resumed → round self-healed with a real `PULSE_SENT`/`DISPATCH_SENT`/`ROUND_PULSE_SENT` (QSolutions confirmed, tracking=RIVA), no manual `/round/start` needed |
+
+**Exit condition — MET 2026-07-11:** A transient GPS gap during an active round produces a `pulse_log` entry and an `INFO` log line, but the round survives and resumes automatic dispatch once GPS data is fresh again — no operator intervention required. `UnitNotActiveException` behavior is provably unchanged (existing test 9.4.22 still green, unmodified). `mvn test` green (278 passing), 0 ArchUnit violations. Confirmed against real Traccar Client hardware, not just mocks.
+
+---
+
 ### Known Debt Introduced / Confirmed in Phase 6
 
 | ID | Location | Severity | Description | Resolution Phase |
 |---|---|---|---|---|
-| FIXME-SEC-FAMILY | `AuthService.java` | MEDIUM | Refresh Token Families not implemented (OAuth 2.0 BCP §4.14). Token theft is undetectable. | Phase 8+ |
-| FIXME-PROXY | `LoginRateLimitFilter.java` | LOW | Rate limit uses `getRemoteAddr()` — if API is behind nginx, read `X-Forwarded-For`. Add when proxy is configured. | Phase 7 deploy |
-| FIXME-PERF | `TokenService.java` | LOW | Triple JWT parse per request (`isTokenValid` + `extractUserId` + `extractRole`). Resolution: `TokenClaims record` + `parseToken()`. | Phase 7 |
-| FIXME-Q6 | `pom.xml` | MEDIUM | `dependency-check-maven` not yet configured. Add before v1.2.0. | Phase 7 |
-| ADR-003 | `User.java`, `UserRepository.java` | LOW | `userId` is a DB surrogate key in the domain. Deferred indefinitely — does not block frontend. | Phase 8+ |
+| FIXME-SEC-FAMILY | `AuthService.java` | MEDIUM | Refresh Token Families not implemented (OAuth 2.0 BCP §4.14). Token theft is undetectable. | Post-frontend (Phase 10+) |
+| FIXME-PROXY | `LoginRateLimitFilter.java` | LOW | Rate limit uses `getRemoteAddr()` — if API is behind nginx, read `X-Forwarded-For`. Add when proxy is configured. | Phase 9 deploy (L8, nginx) |
+| FIXME-PERF | `TokenService.java` | LOW | Triple JWT parse per request (`isTokenValid` + `extractUserId` + `extractRole`). Resolution: `TokenClaims record` + `parseToken()`. | **RESOLVED 2026-07-07** ✅ |
+| FIXME-Q6 | `pom.xml` | RESOLVED | `dependency-check-maven` configured, NVD API key wired, 0 unsuppressed CVEs ≥ CVSS 7.0. `mvn dependency-check:check` — BUILD SUCCESS. | Phase 6 §4.1 ✅ 2026-07-08 |
+| FIXME-REFRESH-BODY | `AuthController.java` | CRITICAL→MEDIUM (reclassified 2026-07-06 — no active exploit, UX-driven not incident-driven) | Refresh token returned in JSON response body. Move to `httpOnly` + `Secure` + `SameSite=Strict` cookie so the frontend never needs `localStorage` and sessions survive page reload. | Phase 7 |
+| ADR-003 | `User.java`, `UserRepository.java` | LOW | `userId` is a DB surrogate key in the domain. Deferred indefinitely — does not block frontend. | Post-frontend (Phase 10+) |
 
 ---
 
-## Phase 7 — React Frontend + Pulse Log (Deferred)
-**Tag:** `v2.0.0`
-**Exit condition:** Frontend deployed on same domain as API. Pulse log visible in dashboard. Auth flow complete.
+## Phase 7 — Auth Hardening + httpOnly Refresh Cookie
+**Tag:** `v1.2.0`
+**Exit condition:** Refresh token is never present in a JSON response body — delivered exclusively via `httpOnly` + `Secure` + `SameSite=Strict` cookie scoped to `Path=/api/auth`. `JwtAuthenticationFilter` parses each JWT exactly once per request. `dependency-check-maven` runs on `mvn verify` with zero unsuppressed HIGH/CRITICAL CVEs. BCrypt strength is configurable via env var. ADR-018 documents the CSRF re-evaluation. `mvn test` passes with zero failures and zero ArchUnit violations. Manual cookie smoke test executed with evidence captured.
+
+> Decided 2026-07-06. Order: Layer 1 (carryover, independent, low risk) → Layer 2 (cookie migration, the sensitive one) → Layer 3 (ADR) → Layer 4 (tests + smoke).
+
+### Layer 1 — Carryover from Phase 6 (fully specified above, execute now)
+
+These three items were spec'd in detail during Phase 6 but explicitly deferred. No new design work — flip the checkboxes.
+
+| Order | Item | Full spec | Status |
+|---|---|---|---|
+| 1.1 | FIXME-PERF — `TokenClaims` record + single-parse `parseToken()` | Phase 6 §3.3 above | ✅ RESOLVED 2026-07-07 |
+| 1.2 | FIXME-Q6 — `dependency-check-maven` plugin, `failBuildOnCVSS=7` | Phase 6 §4.1 above | ✅ RESOLVED 2026-07-08 |
+| 1.3 | BCrypt strength configurable via `app.security.bcrypt-strength` / `BCRYPT_STRENGTH` env var, `PasswordEncoder` bean consolidated into `ApplicationConfig` | Phase 6 §4.2 above | ✅ RESOLVED 2026-07-08 |
+
+Exit condition: all three carryover checklists in Phase 6 §3.3/§4.1/§4.2 fully checked. `mvn test` green.
+
+---
+
+### Layer 2 — httpOnly Refresh Token Cookie Migration
+
+**Problem (FIXME-REFRESH-BODY):** `POST /api/auth/login` and `POST /api/auth/refresh` currently return `refreshToken` in the JSON body. The frontend has no safe place to persist it: `localStorage` is readable by any injected script (XSS → full account takeover), and in-memory storage loses the session on every page reload (F5). Reclassified from an initial CRITICAL label to MEDIUM on 2026-07-06 — the in-memory plan was never actually vulnerable, the real driver is UX (session survives reload), and the fix (`httpOnly` cookie) is the OWASP-recommended pattern for SPA refresh tokens.
+
+**Architectural note — this is (almost) an infrastructure-only change.** `AuthService`, `RefreshTokenRepository`, `TokenService`, and the domain layer need **zero modifications** for `login()`/`refresh()` — `AuthResult(accessToken, refreshToken, expiresAt)` is unchanged; only *where the controller puts* `refreshToken` changes (`Set-Cookie` instead of a JSON field). **One deviation found during implementation:** `AuthService.logout(accessToken, refreshToken)` now must tolerate `refreshToken == null`, because `@CookieValue(required = false)` can hand the controller `null` in the multi-tab case (user already logged out in another tab, cookie already cleared, but this tab's access token is still live). This is a legitimate application-layer change, not a hexagonal violation — `logout()`'s *contract* changes (nullable second parameter), which is a business-rule concern (what does "logout" mean when there's no refresh token to revoke), not an HTTP concern. Everything else stayed exactly where planned.
+
+#### 2.1 — Cookie contract (definitive) ✅ RESOLVED 2026-07-13
+
+```
+Set-Cookie: refresh_token=<jwt>; HttpOnly; Secure; SameSite=Strict; Path=/api/auth; Max-Age=604800
+```
+
+| Attribute | Value | Reason |
+|---|---|---|
+| `HttpOnly` | always | JS cannot read it — the entire point of the migration |
+| `Secure` | always (`app.security.cookie-secure=${COOKIE_SECURE:true}`) | Modern browsers treat `http://localhost` as a secure-context exception, so `Secure` still works in local dev without HTTPS. Env toggle kept only for exotic dev setups (LAN IP, non-localhost tunnel). |
+| `SameSite` | `Strict` | Refresh/logout are the only endpoints reading this cookie, and they are never triggered by a top-level cross-site navigation. `Strict` is stricter than `Lax` with no functional cost here. |
+| `Path` | `/api/auth` | Scopes the cookie to `login`/`refresh`/`logout` only — it is never sent on `/api/units`, `/api/pulse-log`, etc. Reduces exposure surface. Must be **identical** on set and clear, or the browser creates a second cookie instead of deleting the first. |
+| `Max-Age` | `604800` (7 days) on set · `0` on clear | Matches existing `RefreshToken.expiresAt` contract (04-jwt-hardening.md) |
+| `Domain` | not set | Defaults to the current host. Phase 9 L8 serves frontend + API from the same origin via nginx, so no cross-domain cookie is ever needed. |
+
+**Correction to an earlier (2026-07-06 same-day) assessment:** `SameSite` is evaluated on the registrable domain ("site"), which ignores port. `http://localhost:5173` (Vite dev server) and `http://localhost:8080` (API) are **same-site**, so `SameSite=Strict` does **not** block the cookie in local dev, contrary to what was flagged earlier. The real dev-mode requirement is **CORS**, not `SameSite`: exact-origin match (`ALLOWED_ORIGIN=http://localhost:5173`) plus `allowCredentials(true)` on the backend, and `withCredentials: true` (Axios) on the frontend. A Vite dev proxy is optional (it would avoid the CORS preflight entirely) but is not required for the cookie to work — do not treat it as a blocker for Phase 7.
+
+#### 2.2 — DTO changes ✅ RESOLVED 2026-07-13
+
+| File | Change |
+|---|---|
+| `dto/LoginResponse.java` | Remove `refreshToken` field → `record LoginResponse(String accessToken, Instant expiresAt)` |
+| `dto/RefreshResponse.java` | Remove `refreshToken` field → `record RefreshResponse(String accessToken, Instant expiresAt)` |
+| `dto/RefreshRequest.java` | **Delete.** No request body needed — token now arrives via `@CookieValue`. |
+| `dto/LogoutRequest.java` | **Delete.** Same reason — no body needed on logout. |
+
+#### 2.3 — `AuthController` changes ✅ RESOLVED 2026-07-13
+
+```
+POST /api/auth/login — permitAll
+  Request:  LoginRequest (username, password)      — unchanged
+  Response: LoginResponse (accessToken, expiresAt)  — refreshToken REMOVED from body
+            Set-Cookie: refresh_token=...            — added
+  200 OK / 401 on invalid credentials
+
+POST /api/auth/refresh — permitAll
+  Request:  none — @CookieValue(value = "refresh_token", required = false) String refreshToken
+  Response: RefreshResponse (accessToken, expiresAt)
+            Set-Cookie: refresh_token=...            — rotated value (single-use rotation unchanged)
+  200 OK
+  401 (/errors/token-invalid) if cookie is missing — see guard below, must NOT be a 500/NPE
+  401 (/errors/token-expired | /errors/token-revoked) per existing AuthService exceptions
+
+POST /api/auth/logout — authenticated (ADMIN or USER)
+  Request:  none — @CookieValue(value = "refresh_token", required = false) String refreshToken
+  Access token: still from Authorization header (ADR-010 — unchanged)
+  Response: 204 No Content
+            Set-Cookie: refresh_token=...; Max-Age=0  — clears the cookie, same Path/SameSite/Secure attrs
+```
+
+**Guard — missing cookie on refresh must not become a 500.** `AuthService` methods use `Objects.requireNonNull` per project null-safety rules (03-java-production.md) — passing a `null` refresh token straight through would throw `NullPointerException`, not a mapped `RefreshTokenNotFoundException`. `AuthController.refresh()` must check the cookie value itself and throw `RefreshTokenNotFoundException` explicitly before calling the use case:
+
+```java
+if (refreshToken == null) {
+    throw new RefreshTokenNotFoundException("Missing refresh_token cookie");
+}
+```
+
+**Guard — missing cookie on logout must still blacklist the access token.** This is the multi-tab case: user already logged out in another tab, cookie is gone, but the current tab still calls `/api/auth/logout` with a live access token. `AuthService.logout()` must tolerate a `null` refreshToken by skipping the DB revoke step (not calling `revokeByToken(null)`) while still blacklisting the access token — this extends the "full logout regardless" behavior already built in Phase 6 L1 (FIXME-LOGOUT-REFRESH) to the new null case.
+
+**Cookie construction** — use Spring's `ResponseCookie` (an HTTP concern, lives in the controller per ADR-010, not a Spring Security type so it does not violate any hexagonal prohibition):
+
+```java
+ResponseCookie cookie = ResponseCookie.from("refresh_token", token)
+    .httpOnly(true)
+    .secure(cookieSecure)
+    .sameSite("Strict")
+    .path("/api/auth")
+    .maxAge(Duration.ofSeconds(604800))
+    .build();
+response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+```
+
+#### 2.4 — CORS / `SecurityConfig` changes ✅ RESOLVED 2026-07-13
+
+| Task | Detail |
+|---|---|
+| Add `.allowCredentials(true)` to `corsConfigurationSource()` | Required for the browser to send/receive the cookie cross-origin (dev mode) |
+| Confirm `ALLOWED_ORIGIN` is never `*` | Already true since FIXME-CORS (Phase 6 L2) — `allowCredentials(true)` + wildcard origin is rejected by browsers anyway, so this is also a correctness check, not just security |
+| **Do not** add `Set-Cookie` to `exposedHeaders` | Common misconception (present in the original plan) — `exposedHeaders` only controls whether **JavaScript** can read a response header. `httpOnly` cookies are set by the browser automatically regardless of CORS `exposedHeaders`; exposing `Set-Cookie` would be both useless and pointless here since JS must never read this cookie |
+
+#### 2.5 — ADR-018 (document in `CLAUDE.md` when this layer starts) ✅ RESOLVED 2026-07-13 — added to CLAUDE.md §3 ADR table (renumbering note: the informal "ADR-018" label previously used for the Phase 6 GPS `id`↔`numUnidad` design note was never formalized in CLAUDE.md's table, so it was relabeled as an unnumbered design note to free this slot for the real ADR-018 below)
+
+> **ADR-018 — `csrf.disable()` remains safe after introducing the refresh-token cookie.**
+> Status: ACCEPTED. Context: `SecurityConfig` disables CSRF globally (stateless API, Bearer-only access token). Introducing a cookie could reopen CSRF if not scoped correctly. Resolution: the cookie is `Path=/api/auth`, read only by `refresh` and `logout` — no state-mutating business endpoint (`/api/units`, `/api/pulse-log`, etc.) ever reads a cookie, they only accept `Authorization: Bearer`. `SameSite=Strict` blocks the cookie on any cross-site request. Combined, a forged cross-site request cannot trigger `refresh` or `logout` with attacker-controlled effect beyond what an unauthenticated request could already do. Revisit if `SameSite` is ever relaxed to `Lax`/`None`.
+
+#### 2.6 — Test changes ✅ RESOLVED 2026-07-13
+
+| Test class | Change | Status |
+|---|---|---|
+| `AuthControllerTest` | Rewrite login/refresh assertions: `result.getResponse().getCookie("refresh_token")` instead of `jsonPath("$.refreshToken")`. Assert cookie attributes (`isHttpOnly()`, `getSecure()`, `getPath()`, `getMaxAge()`). Add regression test: login response body does **not** contain a `refreshToken` key at all. Add: refresh with missing cookie → 401, not 500. Add: logout sets `Max-Age=0`. | ✅ |
+| `AuthServiceTest` | Add: `logout_withNullRefreshToken_stillBlacklistsAccessTokenWithoutCallingRevoke` — `verify(refreshTokenRepository, never()).revokeByToken(any())`, `verify(tokenBlacklist).blacklist(...)` still called | ✅ |
+| `JwtAuthenticationFilterTest` | No change expected — access token still travels via `Authorization` header only | ✅ confirmed no change needed |
+
+**Evidence:** `mvn test` — 282 tests, 0 failures, 0 errors, 2 skipped, `HexagonalArchitectureTest` 11/11 ArchUnit rules passing, BUILD SUCCESS. Confirmed 2026-07-13 (net +4 over the 278 baseline: +3 `AuthControllerTest`, +1 `AuthServiceTest`).
+
+#### 2.7 — Manual smoke test (cookie jar, curl or Postman) ✅ RESOLVED 2026-07-13
+
+| Step | Command / action | Expected | Actual result |
+|---|---|---|---|
+| 1 | `POST /api/auth/login` with valid credentials | 200, body has `accessToken` + `expiresAt` only (no `refreshToken`), `Set-Cookie` present with `HttpOnly; Secure; SameSite=Strict; Path=/api/auth` | ✅ exact match. Cookie payload decoded: `{"sub":"1","iat":...,"exp":...}`, `exp-iat=604800s`, no `role` claim — matches `04-jwt-hardening.md` refresh token contract |
+| 2 | `POST /api/auth/refresh` using cookie from step 1 | 200, new `accessToken`, `Set-Cookie` rotated to a new value | ✅ exact match, new cookie value confirmed distinct from step 1's |
+| 3 | Replay the **old** cookie value from step 1 against `/api/auth/refresh` | 401, single-use rotation holds | ✅ `401 /errors/token-invalid` (corrected from the original spec's `/errors/token-revoked` guess — `RefreshTokenNotFoundException` and `RefreshTokenRevokedException` share one `GlobalExceptionHandler` handler, both map to `token-invalid`) |
+| 4 | `POST /api/auth/logout` with `Authorization` header + cookie from step 2 | 204, `Set-Cookie: refresh_token=; Max-Age=0` | ✅ exact match, clearing cookie carries identical `Secure/HttpOnly/SameSite/Path` attributes as the set cookie (required for the browser to recognize it as the same cookie) |
+| 5 | `POST /api/auth/refresh` again with the now-revoked cookie from step 2 | 401 `/errors/token-invalid` | ✅ exact match |
+| 6 | `POST /api/auth/refresh` with **no cookie at all** | 401 `/errors/token-invalid` — not 500 | ✅ exact match, confirmed via the explicit `AuthController.refresh()` null-guard, no NPE |
+| 7 | Inspect every response from steps 1–6 | `accessToken` never appears in a `Set-Cookie` header; `refresh_token` never appears in a JSON body | ✅ verified character-by-character across all 6 responses — zero cross-contamination in either direction |
+
+**Environment note for future runs (Windows/PowerShell):** `curl.exe` invoked from Windows PowerShell 5.1 mangles JSON bodies containing embedded double quotes passed via `-d '...'` or `-d "..."` directly on the command line (a native-argv quoting bug, not an application bug — surfaced as `HttpMessageNotReadableException` / `UNREADABLE_BODY` server-side). Workaround used: write the JSON to a file with `[System.IO.File]::WriteAllText(path, json)` (UTF-8 without BOM, unlike `Set-Content -Encoding utf8` which adds a BOM in PS 5.1) and pass it via `-d "@file.json"`.
+
+Exit condition: all 7 steps produce the expected result with evidence (terminal output) captured above. **v1.2.0 gate fully met** — see Phase 7 exit condition at the top of this section.
+
+**Finding surfaced during this smoke test — logged as new debt, not fixed here (out of scope for Layer 2):**
+
+| ID | Location | Severity | Description | Resolution Phase |
+|---|---|---|---|---|
+| FIXME-EXPIRES-AT-AMBIGUOUS | `AuthUseCase.AuthResult`, `LoginResponse`, `RefreshResponse` | MEDIUM (contract-clarity, not a security bug) | `AuthResult.expiresAt()` is populated in `AuthService.login()`/`.refresh()` from `TokenService.GeneratedRefreshToken.expiresAt()` — i.e. it is the **refresh token's** expiry (+7 days), not the access token's. Confirmed by decoding the real JWTs from the smoke test: `accessToken`'s own `exp` claim is 900s (15 min) after `iat`, while the response body's `expiresAt` field reads +604800s. A frontend naively using `expiresAt` from the login/refresh response to schedule a proactive silent-refresh timer would wait 7 days instead of ~15 minutes, leaving the UI to rely entirely on reactive 401-triggered refresh instead. Not a security hole (the access token still genuinely expires at 15 min server-side, so no token gets improperly honored) — but a real contract-precision defect for whoever builds the Phase 9 frontend. Fix options to evaluate in Phase 8: (a) rename the field to `refreshTokenExpiresAt` for honesty, (b) add a second `accessTokenExpiresAt` field, or (c) drop the field entirely and let the frontend decode the JWT's own `exp` claim client-side. | Phase 8 Layer 1 (UI-to-endpoint contract audit) — flag explicitly, do not let it slide into Phase 9 unaddressed |
+
+---
+
+## Phase 8 — Pre-Frontend Readiness
+**Tag:** `v1.3.0`
+**Exit condition:** every screen planned for Phase 9 has a verified, frozen backend contract — verified with real HTTP calls (not just unit tests), not merely assumed to exist. Phase 9 must be design-and-connect only; any contract change discovered during Phase 9 is treated as a Phase 8 regression.
+
+> This phase exists because "the backend has endpoints" and "the backend is ready for a frontend to consume" are different claims. Phase 4–6 built the endpoints for their own layer's exit conditions; nobody has yet checked them against the four screens designed in `PHASE7_PLAN.txt` (Login, Pulse Log Dashboard, Unit Management, User Management).
+
+### Layer 1 — UI-to-Endpoint Contract Audit
+
+Produce one row per UI action, across all four screens. This is a research/audit deliverable, not code — output is a completed version of the table below, committed to `PHASE7_PLAN.txt` or a new `docs/api-contract-audit.md`.
+
+**Audit method:** read every controller in `infrastructure/adapter/in/web/` (`AuthController`, `UnitController`, `PulseController`, `RoundController`, `UserController`, `PulseLogController`) plus their application-layer ports (`ManageUnitUseCase`, `UserManagementUseCase`) directly against `PHASE7_PLAN.txt`'s screen-by-screen UI design (the original, pre-renumbering plan — still the only source for what each screen needs). Completed 2026-07-13.
+
+| Screen | UI action | Endpoint | Status | Notes |
+|---|---|---|---|---|
+| Login | Submit credentials | `POST /api/auth/login` | ✅ confirmed | Phase 7 changed response shape (no `refreshToken` in body, cookie instead) |
+| Login | Session survives reload | `POST /api/auth/refresh` (silent, on app boot) | ✅ confirmed | See FIXME-EXPIRES-AT-AMBIGUOUS (§2.7) — do not build the silent-refresh timer off the response's `expiresAt` field, it's the refresh token's expiry not the access token's |
+| Pulse Log Dashboard | Paginated table + filters (unit, status, date range) | `GET /api/pulse-log` | ⚠️ confirmed with a deviation | `numUnidad`/`status`/`from`/`to`/`page`/`size` all present, filter set matches the UI plan exactly. **But** `size > 100` silently clamps to 100 (`Math.min`, still `200 OK`) instead of rejecting with `400` — contradicts `07-API-Design.md`'s mandatory rule ("Reject with 400 if size > 100") and **corrects a wrong claim** in this document's Phase 6 §Layer 10 Step E.5, which said this was "already covered by automated tests" as a 400 case — the actual test (`PulseLogControllerTest` 9.9.5, `listLogs_withOversizedPage_capsAt100`) asserts the clamp, not a rejection. See Layer 2 gap 2.4. |
+| Pulse Log Dashboard | Stat cards (sent/skipped/errors today, units active) | none | ❌ gap confirmed | No aggregate endpoint exists anywhere in the codebase. See Layer 2 gap 2.2. |
+| Unit Management | List units as cards | `GET /api/units` | ⚠️ confirmed with a deviation | Returns a raw `List<UnitResponse>` — **not paginated**, contradicts `07-API-Design.md`'s mandatory list-pagination rule. Low real-world severity today (fleet is 5 units), but it's a documented rule violation, not a judgment call already made. `roundActive` **is** present per ADR-017 ✅. See Layer 2 gap 2.5. |
+| Unit Management | Edit unit / schedule | `PUT /api/units/{numUnidad}/schedule` | ⚠️ narrower than planned | Schedule update exists and works exactly as ADR-016/017 describe. **There is no generic `PUT /api/units/{numUnidad}`** — only 3 narrow sub-resource endpoints exist: `/activate`, `/deactivate`, `/schedule`. If "edit unit" in the UI plan meant anything beyond toggling active + schedule (e.g. renaming `numUnidad`), that endpoint does not exist. Given `numUnidad` is a natural key used everywhere (DB, JWT-adjacent flows, Traccar device config), renaming is unlikely to ever be a real requirement — recommend confirming the UI plan only needs schedule+activate/deactivate, not a full rename/edit, rather than building a new endpoint for it. |
+| Unit Management | Force dispatch button | `POST /api/units/{numUnidad}/pulse/force` | ✅ confirmed, `204` | **Requires a request body** (`coordinateMode`: `MANUAL` needs `lat`/`lon`, `AUTOMATIC` reads the live Traccar cache) — not a bare no-input button click. Frontend needs at minimum a `coordinateMode` default (`AUTOMATIC`, since that's the real production provider per `gps.provider=traccar`). |
+| Unit Management | Create new unit | `POST /api/units` | ❌ gap confirmed — does not exist at any layer | No controller mapping (confirmed via grep across every controller), no `ManageUnitUseCase.createUnit()` method, no application-service support. Today the fleet is provisioned exclusively via Flyway/DB seed — there has never been a runtime "add a unit" operation. See Layer 2 gap 2.6 — this is a real scope decision, not a small fix. |
+| Unit Management | Toggle round scheduling on/off | `POST /api/units/{numUnidad}/round/start`, `POST /api/units/{numUnidad}/round/stop` | ✅ confirmed | `start` requires `coordinateMode` (+`lat`/`lon` if `MANUAL`); `stop` takes no body. Both return `204`. |
+| User Management | List users, table | `GET /api/users` | ✅ confirmed, paginated | `PagedResponse<UserResponse>`, `page`/`size` query params, `size` capped via `@Max(100)` validation (this one correctly rejects with `400` on violation, unlike pulse-log — see gap 2.4 for the inconsistency) |
+| User Management | Create user | `POST /api/users` | ✅ confirmed, `201` + `Location` header | — |
+| User Management | Edit role / deactivate | `PUT /api/users/{id}` (role/active), `DELETE /api/users/{id}` (deactivate) | ⚠️ confirmed with a real gap | `DELETE` (deactivate) is clean — no body, `204`, works standalone. **But `PUT` is a full-replace requiring a brand-new `rawPassword`** (`@NotBlank @Size(min=8)`) on every single call — a UI action that's "just toggle the role dropdown" or "just flip active" is forced to also submit a password change nobody asked for. No partial-update path exists. See Layer 2 gap 2.7. |
+
+Exit condition: every row has a final status of ✅ (confirmed working as-is) or a linked task in Layer 2 (needs a change). **Met** — 6 of 12 rows needed a Layer 2 gap opened (2.2 and 2.4–2.7 below; 2.1 and 2.3 were already open from before this audit), 6 confirmed working as-is.
+
+### Layer 2 — Close Contract Gaps
+
+Each gap found becomes one row here with the same rigor as any other layer in this document (file, change, test, exit condition). Populated from Layer 1's completed audit above (2026-07-13) — these are confirmed gaps, not speculative candidates.
+
+| Order | Gap | Why it matters | Fix options (decision needed — not yet chosen) |
+|---|---|---|---|
+| 2.1 | `UnitResponse` may be missing a `lastPulseAt` timestamp | Unit Management cards need it per the Phase 7-session UI design; if absent, either add it to the response or confirm the dashboard derives it from `pulse_log` instead | Still open from before this audit — not re-verified in this pass, carry forward |
+| 2.2 | No aggregate "stats today" endpoint (`GET /api/pulse-log` has no summary/count-by-status mode) | Dashboard stat cards (sent/skipped/errors/units-active) have nothing to bind to | (a) new `GET /api/pulse-log/stats` server-side aggregate (single grouped query), or (b) client reduces today's page(s) of `GET /api/pulse-log` itself — (a) is cheaper at scale and avoids the dashboard needing to paginate through the whole day; (b) is zero backend work but wrong once daily volume exceeds one page |
+| 2.3 | FIXME-EXPIRES-AT-AMBIGUOUS — `LoginResponse.expiresAt`/`RefreshResponse.expiresAt` is the refresh token's 7-day expiry, not the access token's 15-min expiry (found during Phase 7 §2.7 smoke test) | The Login screen's silent-refresh-on-reload logic must not be built against a naive reading of this field | Rename to `refreshTokenExpiresAt`, add a separate `accessTokenExpiresAt`, or drop the field and let the frontend decode the JWT's own `exp` claim client-side (see §2.7 for full writeup) |
+| 2.4 | `GET /api/pulse-log?size>100` silently clamps instead of rejecting with `400`, contradicting `07-API-Design.md`'s own mandatory rule and inconsistent with `GET /api/users` (which correctly rejects via `@Max(100)`) | A frontend bug sending `size=10000` fails silently (gets 100 rows back, no error signal) on one endpoint but loudly (`400`) on another — inconsistent API behavior the same frontend team has to special-case per-endpoint | (a) make `PulseLogController` reject with `400` via `@Max(100)` like `UserController` does, for consistency — recommended, matches the documented rule and the sibling endpoint; or (b) formally amend `07-API-Design.md`'s rule to "clamp, don't reject" project-wide and make `UserController` match instead. Pick one — do not leave the inconsistency. |
+| 2.5 | `GET /api/units` returns an unpaginated `List<UnitResponse>`, contradicting `07-API-Design.md`'s mandatory list-pagination rule | Rule violation today has near-zero real impact (fleet = 5 units, no scale risk), but Phase 8's whole purpose is freezing a contract Phase 9 builds against permanently — an intentional exception should be a documented ADR, not a silent gap | (a) paginate it now for consistency with every other list endpoint (small, mechanical change), or (b) accept it as a documented exception (new ADR: "small bounded fleet size makes pagination unnecessary overhead") — recommend (b) given the 5-unit business reality, but it must be a written decision, not silence |
+| 2.6 | `POST /api/units` (create unit) does not exist at any layer — no controller, no use-case method, no application service | Confirmed no runtime "add a unit" path exists; today units are Flyway/DB-seeded only. If Phase 9's Unit Management screen ships a "Create unit" button per the original UI plan, it has nothing to call | (a) build the full vertical slice (domain validation, `ManageUnitUseCase.createUnit()`, persistence, controller, DTOs, tests, ArchUnit compliance) — non-trivial, multi-layer work; or (b) drop "Create unit" from the Phase 9 scope entirely, since the fleet is small and operationally static (new units are a rare, deliberate ops event, arguably fine to keep DB-seed-only) — recommend confirming with the user which one reflects actual operational need before Phase 9 UI work starts |
+| 2.7 | `PUT /api/users/{id}` requires a new `rawPassword` (`@NotBlank`, min 8 chars) on every call, even when the UI action is only "change role" or "toggle active" | Forces the ADMIN to invent/retype a password just to flip a dropdown — bad UX, and encourages careless password entry as a side effect of an unrelated action | (a) make `rawPassword` optional in `UpdateUserRequest` (null/blank → keep existing hash, don't call the hasher) — smallest change, keeps `PUT` full-replace semantics loosely; or (b) split into `PATCH /api/users/{id}` for role/active-only changes and keep `PUT` password-inclusive for the rare full edit — more correct REST semantics per `07-API-Design.md`'s own PATCH guidance ("use only when PUT is wasteful, document clearly") but is new endpoint surface. Recommend (b) since this is exactly the documented PATCH use case. |
+
+### Layer 3 — OpenAPI Contract Freeze
 
 | Status | Task |
 |---|---|
-| ⬜ | `V5__pulse_log.sql` Flyway migration |
-| ⬜ | Pulse log write on every dispatch result (SENT, SKIPPED, REJECTED, ERROR) |
-| ⬜ | React project initialized |
-| ⬜ | Authentication flow — login, access token storage, refresh |
-| ⬜ | Dashboard — unit status, active window, last pulse timestamp |
-| ⬜ | Pulse log table — filterable by unit and status |
-| ⬜ | Deployment — backend + frontend on same domain with HTTPS |
+| ⬜ | Regenerate `/v3/api-docs`, confirm every endpoint in the Layer 1 audit is documented with `@Operation` + `@ApiResponse` |
+| ⬜ | Export a static snapshot (`openapi.json`) and commit it to the repo |
+| ⬜ | Add a CI/manual check comparing live `/v3/api-docs` against the committed snapshot — drift means the contract moved without the roadmap being updated |
+
+### Layer 4 — End-to-End Integration Test Suite (new)
+
+Distinct from the existing unit/controller test suite — this exercises the full stack in one flow, the way the frontend actually will.
+
+| Status | Task |
+|---|---|
+| ⬜ | New test class `FullDispatchFlowIntegrationTest` — `@SpringBootTest` + Testcontainers (MySQL + Redis), real HTTP client (`TestRestTemplate` or `WebTestClient`), cookie jar enabled |
+| ⬜ | Flow: login → cookie captured → `GET /api/units` with access token → `POST /api/units/{id}/pulse/force` → `GET /api/pulse-log` confirms new `SENT` entry → `POST /api/auth/refresh` via cookie → `POST /api/auth/logout` → confirm cookie cleared and access token now rejected |
+
+Exit condition: flow passes end-to-end in a single test run, proving the endpoints compose correctly, not just individually.
+
+### Layer 5 — Browser-Realistic CORS/Cookie Verification
+
+MockMvc and `TestRestTemplate` do not exercise real browser CORS/cookie enforcement. Before trusting Phase 7's cookie work, prove it under an actual browser.
+
+| Status | Task |
+|---|---|
+| ⬜ | Minimal static HTML page (`scratch/cors-test.html`, not committed) served from a different port than the API, using `fetch(..., { credentials: 'include' })` against `/api/auth/login` and `/api/auth/refresh` |
+| ⬜ | Confirm in DevTools Network tab: `Set-Cookie` accepted, cookie sent back on `/api/auth/refresh`, no CORS error in console |
+| ⬜ | Confirm cookie does **not** get sent to `/api/units` or other non-`/api/auth` endpoints (Path scoping working) |
+
+### Layer 6 — Full Manual Smoke Test Script
+
+One documented pass per screen, in the same style as the Phase 5 production-replacement smoke test.
+
+| Status | Task |
+|---|---|
+| ⬜ | Login flow: bad credentials → 401; good credentials → 200 + cookie; reload-equivalent (call refresh) → new access token |
+| ⬜ | Pulse Log Dashboard flow: list with no filters → paginated; filter by unit; filter by status; filter by date range; combine filters |
+| ⬜ | Unit Management flow: list units; create unit (ADMIN); edit schedule; force dispatch; toggle round; confirm USER token gets 403 on create/edit/delete but 200 on list and force dispatch (dual-role matrix) |
+| ⬜ | User Management flow: list users (ADMIN); create user; edit role; deactivate; confirm USER token gets 403 on all of these |
+
+### Layer 7 — Contract Freeze Declaration
+
+| Status | Task |
+|---|---|
+| ⬜ | Tag `v1.3.0` only after Layers 1–6 are complete |
+| ⬜ | Add explicit note to `CLAUDE.md` Phase 9 readiness checklist: "No backend contract changes during Phase 9 except genuine bugs found while integrating — any UI-driven shape change is a Phase 8 regression" |
+
+Exit condition: `v1.3.0` tagged. Every screen in Phase 9 can be built against a contract that will not move under it.
+
+---
+
+## Phase 9 — React Frontend (renumbered from the original Phase 7 plan)
+**Tag:** `v2.0.0`
+**Exit condition:** frontend deployed on the same origin as the API via nginx. All four screens functional against the frozen Phase 8 contract. Auth flow uses the Phase 7 httpOnly cookie — no token ever touches `localStorage`.
+
+> Built screen by screen, in the order a user actually encounters them: Login → Home/Dashboard shell → Pulse Log (the default landing screen for both roles) → Unit Management → User Management. Backend cookie prep (previously "L0" in the original plan) is now fully covered by Phase 7 — removed from this phase.
+
+Stack: Vite + TypeScript, shadcn/ui (Tailwind + Radix), Zustand (auth store) + TanStack Query (server state), React Hook Form + Zod, React Router v6, Axios.
+
+### Layer 1 — Scaffold
+
+| Status | Task |
+|---|---|
+| ⬜ | `frontend/` directory inside the monorepo, Vite + TypeScript template |
+| ⬜ | ESLint + Prettier configured |
+| ⬜ | shadcn/ui + Tailwind CSS initialized with the color tokens decided in `PHASE7_PLAN.txt` (sidebar `#0f172a`, background `#f8fafc`, primary `#6366f1`) |
+| ⬜ | Folder structure: `src/screens/`, `src/components/`, `src/lib/api/`, `src/store/` |
+
+### Layer 2 — API Client
+
+| Status | Task |
+|---|---|
+| ⬜ | Axios instance, `baseURL` from env, `withCredentials: true` (required for the Phase 7 cookie) |
+| ⬜ | Response interceptor: on 401 from a non-auth endpoint, attempt silent `POST /api/auth/refresh`, then retry the original request |
+| ⬜ | Race-condition guard: while a refresh is in flight, queue concurrent 401s instead of firing parallel refresh calls — resolve the queue when the in-flight refresh completes |
+| ⬜ | RFC 7807 error normalization — one place that turns `ProblemDetail` JSON into a typed error the UI can render |
+
+### Layer 3 — Screen: Login
+
+| Status | Task |
+|---|---|
+| ⬜ | Login form — username/password, client-side validation via Zod, submit via `POST /api/auth/login` |
+| ⬜ | Zustand auth store holds `accessToken` + `role` **in memory only** — never persisted to `localStorage`/`sessionStorage` |
+| ⬜ | On app boot, silently call `POST /api/auth/refresh` (cookie-driven) to restore a session without asking the user to log in again |
+| ⬜ | Protected route wrapper — redirects to `/login` when the store has no valid access token and silent refresh fails |
+| ⬜ | UI per `PHASE7_PLAN.txt`: centered card, error banner on invalid credentials, loading state on submit |
+
+### Layer 4 — Shell / Layout (role-aware)
+
+| Status | Task |
+|---|---|
+| ⬜ | Sidebar + topbar layout, dark sidebar per design spec |
+| ⬜ | Nav items driven by role from the auth store, matching the authorization matrix in `04-jwt-hardening.md`: **USER** sees Pulse Log only; **ADMIN** sees Pulse Log + Units + Users |
+| ⬜ | User menu — avatar, role chip, logout (calls `POST /api/auth/logout`, clears Zustand store, redirects to `/login`) |
+
+### Layer 5 — Screen: Pulse Log Dashboard (home screen, both roles)
+
+| Status | Task |
+|---|---|
+| ⬜ | Stat cards (sent/skipped/errors today, units active) — endpoint decided in Phase 8 §2.2 |
+| ⬜ | Paginated table via TanStack Query against `GET /api/pulse-log`, columns per `PHASE7_PLAN.txt` |
+| ⬜ | Filters: unit, status, date range — wired to query params confirmed in Phase 8 Layer 1 |
+| ⬜ | 30s auto-refresh (TanStack Query `refetchInterval`) + manual refresh button |
+| ⬜ | Status chips colored per the palette in `PHASE7_PLAN.txt` |
+
+### Layer 6 — Screen: Unit Management (dual-role panel)
+
+| Status | Task |
+|---|---|
+| ⬜ | Card grid, one per unit, via `GET /api/units` |
+| ⬜ | Force-dispatch button visible to **both** ADMIN and USER (matrix: `/api/units/*/pulse/**` is dual-role) |
+| ⬜ | Edit / create / delete controls visible to **ADMIN only** — hidden (not just disabled) for USER, since the backend already 403s them; hiding avoids a confusing error state |
+| ⬜ | Schedule edit modal, round on/off toggle |
+
+### Layer 7 — Screen: User Management (ADMIN-only panel)
+
+| Status | Task |
+|---|---|
+| ⬜ | Route guarded — USER role never reaches this screen client-side (defense in depth; server-side 403 is the real boundary) |
+| ⬜ | Nav item hidden for USER role (Layer 4) |
+| ⬜ | Table: username, role chip, active status, actions dropdown (edit role, deactivate) |
+| ⬜ | Create-user form |
+
+### Layer 8 — Deployment
+
+| Status | Task |
+|---|---|
+| ⬜ | nginx config: reverse-proxy `/api/**` to the Spring Boot process, serve the built frontend static assets on `/`, single origin — eliminates CORS entirely in production and satisfies `SameSite=Strict` with zero cross-site edge cases |
+| ⬜ | FIXME-PROXY resolved here: `LoginRateLimitFilter` reads `X-Forwarded-For` behind nginx |
+| ⬜ | HTTPS termination at nginx, `Secure` cookie now backed by real TLS instead of the localhost exception |
+
+### Layer 9 — Tests
+
+| Status | Task |
+|---|---|
+| ⬜ | Vitest + React Testing Library configured |
+| ⬜ | Auth flow test — login, silent refresh, logout, protected route redirect (mocked API) |
+| ⬜ | Smoke-level render test per screen |
 
 ---
 

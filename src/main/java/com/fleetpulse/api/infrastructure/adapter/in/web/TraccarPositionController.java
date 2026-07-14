@@ -3,7 +3,6 @@ package com.fleetpulse.api.infrastructure.adapter.in.web;
 import com.fleetpulse.api.domain.exception.InvalidCoordinateException;
 import com.fleetpulse.api.domain.model.GpsReading;
 import com.fleetpulse.api.domain.model.ProviderType;
-import com.fleetpulse.api.infrastructure.adapter.in.web.dto.TraccarClientPushRequest;
 import com.fleetpulse.api.infrastructure.adapter.out.cache.GpsPositionCache;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,7 +11,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,7 +37,7 @@ public class TraccarPositionController {
 
     @GetMapping("/position")
     @Operation(
-            summary = "Receive GPS push from Traccar OsmAnd client",
+            summary = "Receive GPS push from Traccar Client (HTTP GET / OsmAnd protocol)",
             description = "Public endpoint required by OsmAnd protocol. Uses GET with query params. "
                     + "Unknown unit IDs are silently accepted. Invalid coordinates return 400."
     )
@@ -51,7 +49,31 @@ public class TraccarPositionController {
             @RequestParam(required = false) Double accuracy,
             @RequestParam(required = false) Double speed,
             @RequestParam(required = false) Double bearing) {
+        return storeReading(id, lat, lon);
+    }
 
+    @PostMapping("/position")
+    @Operation(
+            summary = "Receive GPS push from Traccar Client (HTTP POST / OsmAnd protocol)",
+            description = "Public endpoint for Traccar Client's HTTP POST mode. The real client sends the "
+                    + "same OsmAnd-style fields (id, lat, lon, timestamp, accuracy, altitude, batt, charge) "
+                    + "as an application/x-www-form-urlencoded body, not a JSON payload — Spring binds "
+                    + "form-urlencoded POST parameters the same way as query parameters. "
+                    + "Unknown unit IDs are silently accepted. Invalid coordinates return 400."
+    )
+    public ResponseEntity<Void> receivePositionForm(
+            @RequestParam String id,
+            @RequestParam double lat,
+            @RequestParam double lon,
+            @RequestParam(required = false) Long timestamp,
+            @RequestParam(required = false) Double accuracy,
+            @RequestParam(required = false) Double altitude,
+            @RequestParam(required = false) Integer batt,
+            @RequestParam(required = false) Boolean charge) {
+        return storeReading(id, lat, lon);
+    }
+
+    private ResponseEntity<Void> storeReading(String id, double lat, double lon) {
         if (id == null || id.isBlank()) {
             throw new InvalidCoordinateException("id (numUnidad) must not be blank");
         }
@@ -73,39 +95,6 @@ public class TraccarPositionController {
                 String.format("%.4f", lat),
                 String.format("%.4f", lon));
 
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/position")
-    @Operation(
-            summary = "Receive GPS push from Traccar Client app (JSON body)",
-            description = "Public endpoint for Traccar Client native HTTP protocol. Accepts POST with JSON body. "
-                    + "Unknown unit IDs are silently accepted. Invalid coordinates return 400."
-    )
-    public ResponseEntity<Void> receivePositionFromClient(@RequestBody TraccarClientPushRequest request) {
-        if (request.deviceId() == null || request.deviceId().isBlank()) {
-            throw new InvalidCoordinateException("device_id must not be blank");
-        }
-        if (request.location() == null || request.location().coords() == null) {
-            throw new InvalidCoordinateException("location.coords must not be null");
-        }
-
-        TraccarClientPushRequest.CoordsData coords = request.location().coords();
-
-        GpsReading reading = new GpsReading(
-                request.deviceId(),
-                BigDecimal.valueOf(coords.latitude()),
-                BigDecimal.valueOf(coords.longitude()),
-                ZonedDateTime.now(clock),
-                ProviderType.TRACCAR
-        );
-
-        gpsPositionCache.store(request.deviceId(), reading);
-
-        log.info("GPS_RECEIVED numUnidad={} lat={} lon={}",
-                request.deviceId(),
-                String.format("%.4f", coords.latitude()),
-                String.format("%.4f", coords.longitude()));
 
         return ResponseEntity.ok().build();
     }

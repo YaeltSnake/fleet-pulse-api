@@ -2,9 +2,11 @@ package com.fleetpulse.api.infrastructure.security;
 
 import com.fleetpulse.api.application.port.out.TokenService;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -251,5 +253,77 @@ class JwtServiceTest {
 
         // Assert
         assertThat(ttl).isEqualTo(Duration.ZERO);
+    }
+
+    // ==================== parseToken (FIXME-PERF resolution) ====================
+
+    @Test
+    void parseToken_withValidToken_returnsUserIdRoleAndPositiveTtl() {
+        // Arrange
+        String token = jwtService.generateAccessToken(77L, "ADMIN");
+
+        // Act
+        TokenService.TokenClaims claims = jwtService.parseToken(token);
+
+        // Assert
+        assertThat(claims.userId()).isEqualTo(77L);
+        assertThat(claims.role()).isEqualTo("ADMIN");
+        assertThat(claims.remainingTtl()).isPositive();
+        assertThat(claims.remainingTtl().getSeconds()).isLessThanOrEqualTo(ACCESS_EXPIRY_SECONDS);
+    }
+
+    @Test
+    void parseToken_withRefreshToken_returnsNullRole() {
+        // Arrange — refresh tokens carry no role claim by design
+        String refreshToken = jwtService.generateRefreshToken(1L).token();
+
+        // Act
+        TokenService.TokenClaims claims = jwtService.parseToken(refreshToken);
+
+        // Assert
+        assertThat(claims.role()).isNull();
+    }
+
+    @Test
+    void parseToken_withExpiredToken_throwsExpiredJwtException() {
+        // Arrange
+        String expiredToken = Jwts.builder()
+                .subject("1")
+                .issuedAt(Date.from(Instant.now().minusSeconds(120)))
+                .expiration(Date.from(Instant.now().minusSeconds(60)))
+                .signWith(signingKey)
+                .compact();
+
+        // Act + Assert
+        assertThatThrownBy(() -> jwtService.parseToken(expiredToken))
+                .isInstanceOf(ExpiredJwtException.class);
+    }
+
+    @Test
+    void parseToken_withWrongSignature_throwsSignatureException() {
+        // Arrange
+        String anotherSecret = "YW5vdGhlci1zZWNyZXQta2V5LWZvci10ZXN0aW5nLWZha2UtdG9rZW5z";
+        JwtService anotherService = new JwtService(anotherSecret, ACCESS_EXPIRY_SECONDS, REFRESH_EXPIRY_SECONDS);
+        String token = anotherService.generateAccessToken(99L, "USER");
+
+        // Act + Assert
+        assertThatThrownBy(() -> jwtService.parseToken(token))
+                .isInstanceOf(SignatureException.class);
+    }
+
+    @Test
+    void parseToken_withNonNumericSubject_throwsIllegalArgumentException() {
+        // Arrange — valid signature, non-numeric subject triggers NumberFormatException in production
+        String malformedToken = Jwts.builder()
+                .subject("not-a-number")
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plusSeconds(60)))
+                .signWith(signingKey)
+                .compact();
+
+        // Act + Assert
+        assertThatThrownBy(() -> jwtService.parseToken(malformedToken))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid userId format in token");
     }
 }

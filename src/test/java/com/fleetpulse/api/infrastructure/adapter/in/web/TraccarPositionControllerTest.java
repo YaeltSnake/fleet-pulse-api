@@ -10,8 +10,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import org.springframework.http.MediaType;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -122,28 +120,20 @@ class TraccarPositionControllerTest {
         verify(gpsPositionCache).store(eq("Peugeot"), any());
     }
 
-    // 9.6.10 — Traccar Client POST JSON body accepted and stored in cache
+    // 9.6.10 — real Traccar Client POST (application/x-www-form-urlencoded, OsmAnd-style fields)
+    // accepted and stored in cache. Matches the actual client payload captured in production
+    // (id, lat, lon, timestamp, accuracy, altitude, batt, charge) — NOT a JSON body.
     @Test
-    void receivePositionFromClient_withValidJsonBody_returns200AndStoresReading() throws Exception {
-        String body = """
-                {
-                  "device_id": "Peugeot",
-                  "location": {
-                    "coords": {
-                      "latitude": 19.5709,
-                      "longitude": -99.2406,
-                      "accuracy": 10.97,
-                      "altitude": 2278.62,
-                      "speed": -1,
-                      "heading": -1
-                    }
-                  }
-                }
-                """;
-
+    void receivePositionForm_withValidFormParams_returns200AndStoresReading() throws Exception {
         mockMvc.perform(post("/api/gps/position")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                        .param("id", "Peugeot")
+                        .param("lat", "19.5709")
+                        .param("lon", "-99.2406")
+                        .param("timestamp", "1783559346")
+                        .param("accuracy", "10.97")
+                        .param("altitude", "2278.62")
+                        .param("batt", "85")
+                        .param("charge", "false"))
                 .andExpect(status().isOk());
 
         verify(gpsPositionCache).store(eq("Peugeot"), any());
@@ -151,51 +141,21 @@ class TraccarPositionControllerTest {
 
     // 9.6.11 — POST with invalid coordinates returns 400
     @Test
-    void receivePositionFromClient_withInvalidLatitude_returns400() throws Exception {
-        String body = """
-                {
-                  "device_id": "Peugeot",
-                  "location": {
-                    "coords": {
-                      "latitude": 95.0,
-                      "longitude": -99.2406,
-                      "accuracy": 10.0,
-                      "altitude": 0,
-                      "speed": 0,
-                      "heading": 0
-                    }
-                  }
-                }
-                """;
-
+    void receivePositionForm_withInvalidLatitude_returns400() throws Exception {
         mockMvc.perform(post("/api/gps/position")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                        .param("id", "Peugeot")
+                        .param("lat", "95.0")
+                        .param("lon", "-99.2406"))
                 .andExpect(status().isBadRequest());
     }
 
     // 9.6.12 — POST without auth header is accepted (public endpoint)
     @Test
-    void receivePositionFromClient_withoutAuthHeader_returns200() throws Exception {
-        String body = """
-                {
-                  "device_id": "Peugeot",
-                  "location": {
-                    "coords": {
-                      "latitude": 19.5709,
-                      "longitude": -99.2406,
-                      "accuracy": 5.0,
-                      "altitude": 2200.0,
-                      "speed": 0,
-                      "heading": 0
-                    }
-                  }
-                }
-                """;
-
+    void receivePositionForm_withoutAuthHeader_returns200() throws Exception {
         mockMvc.perform(post("/api/gps/position")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                        .param("id", "Peugeot")
+                        .param("lat", "19.5709")
+                        .param("lon", "-99.2406"))
                 .andExpect(status().isOk());
     }
 }
