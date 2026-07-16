@@ -85,8 +85,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT,  "/api/units/**").hasAuthority(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/units/**").hasAuthority(ROLE_ADMIN)
 
-                        // Pulse log — readable by ADMIN and USER (dashboard)
+                        // Pulse log — readable by ADMIN and USER (dashboard). /stats is a distinct
+                        // path from the exact-match rule above and needs its own explicit rule, or
+                        // it falls through to anyRequest().denyAll() (403 for everyone, including ADMIN).
                         .requestMatchers(HttpMethod.GET, "/api/pulse-log").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
+                        .requestMatchers(HttpMethod.GET, "/api/pulse-log/stats").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
 
                         // Secure default
                         .anyRequest().denyAll()

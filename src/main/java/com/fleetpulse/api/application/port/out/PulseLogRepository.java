@@ -31,4 +31,6 @@ public interface PulseLogRepository {
     Optional<ZonedDateTime> findLatestSentAt(String numUnidad);
 
     Map<String, ZonedDateTime> findLatestSentAtForAllUnits();
+
+    Map<PulseLogStatus, Long> countGroupedByStatus(ZonedDateTime from, ZonedDateTime to);
 }

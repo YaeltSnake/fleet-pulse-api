@@ -65,6 +65,15 @@ public class PulseLogJpaAdapter implements PulseLogRepository {
                 ));
     }
 
+    @Override
+    public Map<PulseLogStatus, Long> countGroupedByStatus(ZonedDateTime from, ZonedDateTime to) {
+        return jpaRepository.countGroupedByStatus(toLocal(from), toLocal(to)).stream()
+                .collect(Collectors.toMap(
+                        row -> (PulseLogStatus) row[0],
+                        row -> (Long) row[1]
+                ));
+    }
+
     private PulseLog toDomain(PulseLogEntity entity) {
         ZonedDateTime sentAt = entity.getSentAt().atZone(FLEET_TIMEZONE);
         return new PulseLog(

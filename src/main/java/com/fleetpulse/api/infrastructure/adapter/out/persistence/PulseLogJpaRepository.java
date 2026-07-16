@@ -48,4 +48,11 @@ public interface PulseLogJpaRepository extends JpaRepository<PulseLogEntity, Lon
 
     @Query("SELECT e.numUnidad, MAX(e.sentAt) FROM PulseLogEntity e GROUP BY e.numUnidad")
     List<Object[]> findLatestSentAtGroupedByUnit();
+
+    @Query("""
+            SELECT e.status, COUNT(e) FROM PulseLogEntity e
+            WHERE e.sentAt >= :from AND e.sentAt < :to
+            GROUP BY e.status
+            """)
+    List<Object[]> countGroupedByStatus(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }

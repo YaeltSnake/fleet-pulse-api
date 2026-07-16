@@ -13,8 +13,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -137,5 +140,73 @@ class PulseLogControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(2))
                 .andExpect(jsonPath("$.size").value(10));
+    }
+
+    // ── GET /api/pulse-log/stats (gap 2.2) ───────────────────────────────────
+
+    // 9.9.8 — ADMIN gets grouped counts by status
+    @Test
+    @WithMockUser(authorities = "ADMIN")
+    void getStats_asAdmin_returns200WithGroupedCounts() throws Exception {
+        when(pulseLogRepository.countGroupedByStatus(any(), any()))
+                .thenReturn(Map.of(PulseLogStatus.SENT, 3L, PulseLogStatus.SKIPPED_STALE, 1L));
+
+        mockMvc.perform(get("/api/pulse-log/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.countsByStatus.SENT").value(3))
+                .andExpect(jsonPath("$.countsByStatus.SKIPPED_STALE").value(1))
+                .andExpect(jsonPath("$.total").value(4));
+    }
+
+    // 9.9.9 — USER can also read stats (dashboard access, same as the list endpoint)
+    @Test
+    @WithMockUser(authorities = "USER")
+    void getStats_asUser_returns200() throws Exception {
+        when(pulseLogRepository.countGroupedByStatus(any(), any()))
+                .thenReturn(Map.of());
+
+        mockMvc.perform(get("/api/pulse-log/stats"))
+                .andExpect(status().isOk());
+    }
+
+    // 9.9.10 — unauthenticated returns 401
+    @Test
+    void getStats_withoutAuth_returns401() throws Exception {
+        mockMvc.perform(get("/api/pulse-log/stats"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // 9.9.11 — no date param defaults to today in fleet timezone
+    @Test
+    @WithMockUser(authorities = "ADMIN")
+    void getStats_withNoDateParam_defaultsToToday() throws Exception {
+        when(pulseLogRepository.countGroupedByStatus(any(), any())).thenReturn(Map.of());
+        String today = LocalDate.now(ZoneId.of("America/Mexico_City")).toString();
+
+        mockMvc.perform(get("/api/pulse-log/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.date").value(today));
+    }
+
+    // 9.9.12 — explicit date param is respected
+    @Test
+    @WithMockUser(authorities = "ADMIN")
+    void getStats_withExplicitDate_respectsParam() throws Exception {
+        when(pulseLogRepository.countGroupedByStatus(any(), any())).thenReturn(Map.of());
+
+        mockMvc.perform(get("/api/pulse-log/stats").param("date", "2026-07-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.date").value("2026-07-01"));
+    }
+
+    // 9.9.13 — no pulses that day returns an empty map and zero total, not an error
+    @Test
+    @WithMockUser(authorities = "ADMIN")
+    void getStats_withNoPulsesThatDay_returnsZeroTotal() throws Exception {
+        when(pulseLogRepository.countGroupedByStatus(any(), any())).thenReturn(Map.of());
+
+        mockMvc.perform(get("/api/pulse-log/stats").param("date", "2020-01-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
     }
 }
