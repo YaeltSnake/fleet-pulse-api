@@ -69,6 +69,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,  "/api/users").hasAuthority(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.POST, "/api/users").hasAuthority(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.PUT,  "/api/users/**").hasAuthority(ROLE_ADMIN)
+                        .requestMatchers(HttpMethod.PATCH, "/api/users/**").hasAuthority(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/users/**").hasAuthority(ROLE_ADMIN)
 
                         // Units — GET (ADMIN + USER); PUT sub-resources before broad PUT /**
@@ -104,7 +105,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(allowedOrigin));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
         // Required for the browser to send/receive the httpOnly refresh_token cookie

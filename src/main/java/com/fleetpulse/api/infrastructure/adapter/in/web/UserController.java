@@ -5,6 +5,7 @@ import com.fleetpulse.api.domain.model.User;
 import com.fleetpulse.api.infrastructure.adapter.in.web.dto.CreateUserRequest;
 import com.fleetpulse.api.infrastructure.adapter.in.web.dto.PagedResponse;
 import com.fleetpulse.api.infrastructure.adapter.in.web.dto.UpdateUserRequest;
+import com.fleetpulse.api.infrastructure.adapter.in.web.dto.UpdateUserRoleRequest;
 import com.fleetpulse.api.infrastructure.adapter.in.web.dto.UserResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -140,6 +141,34 @@ public class UserController {
 
         return ResponseEntity.ok(UserResponse.from(user));
 
+    }
+
+    @Operation(
+            summary = "Update user role and active status",
+            description = "Partial update -- only role and active status. Never accepts a password; "
+                    + "use PUT for a full replace including password."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "User role/active updated successfully",
+                    content = @Content(schema = @Schema(implementation = UserResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Validation failed",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT token",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "403", description = "Authenticated user lacks ADMIN authority",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "404", description = "User ID not found",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    @PatchMapping("/{id}")
+    @PreAuthorize(ADMIN_AUTHORITY)
+    public ResponseEntity<UserResponse> updateUserRole(
+            @PathVariable Long id,
+            @RequestBody @Valid UpdateUserRoleRequest request
+    ){
+        User user = useCase.updateRoleAndActive(id, request.role(), request.active());
+
+        return ResponseEntity.ok(UserResponse.from(user));
     }
 
     @Operation(

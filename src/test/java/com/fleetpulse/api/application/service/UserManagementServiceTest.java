@@ -145,6 +145,39 @@ class UserManagementServiceTest {
     }
 
     @Test
+    void updateRoleAndActive_whenUserFound_preservesUsernameAndPasswordHash() {
+        // Arrange
+        User existing = new User(1L, "operador1", "existingHash", Role.ADMIN, true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        // Act
+        service.updateRoleAndActive(1L, Role.USER, false);
+
+        // Assert
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        User saved = captor.getValue();
+
+        assertThat(saved.getUsername()).isEqualTo("operador1");
+        assertThat(saved.getPasswordHash()).isEqualTo("existingHash");
+        assertThat(saved.getRole()).isEqualTo(Role.USER);
+        assertThat(saved.isActive()).isFalse();
+        verify(passwordHasher, never()).encode(any());
+    }
+
+    @Test
+    void updateRoleAndActive_whenUserNotFound_throwsUserNotFoundException() {
+        // Arrange
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        // Act + Assert
+        assertThatThrownBy(() -> service.updateRoleAndActive(99L, Role.USER, false))
+                .isInstanceOf(UserNotFoundException.class);
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
     void deactivateUser_delegatesToRepository() {
         // Arrange
         User user = new User(5L, "any-user", "hash", Role.USER, true);

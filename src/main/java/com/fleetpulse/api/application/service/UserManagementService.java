@@ -7,6 +7,7 @@ import com.fleetpulse.api.application.port.out.PasswordHasher;
 import com.fleetpulse.api.application.port.out.UserRepository;
 import com.fleetpulse.api.domain.exception.UserNotFoundException;
 import com.fleetpulse.api.domain.exception.UsernameAlreadyExistsException;
+import com.fleetpulse.api.domain.model.Role;
 import com.fleetpulse.api.domain.model.User;
 
 import java.util.List;
@@ -46,6 +47,15 @@ public class UserManagementService implements UserManagementUseCase {
                 : existing.getPasswordHash();
 
         return userRepository.save(new User(existing.getId(), command.username(), hash, command.role(), command.active()));
+    }
+
+    @Override
+    public User updateRoleAndActive(Long id, Role role, boolean active) {
+        User existing = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+
+        return userRepository.save(new User(
+                existing.getId(), existing.getUsername(), existing.getPasswordHash(), role, active));
     }
 
     @Override
