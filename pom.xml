@@ -255,6 +255,17 @@
 	<profiles>
 		<profile>
 			<id>soap-codegen</id>
+			<!-- FIXME-CLEAN-BUILD (RESOLVED 2026-07-16): active by default so `mvn clean test`/
+			     `mvn clean install` always regenerate the org.tempuri.* SOAP stubs (ReceiveGPSInfoSoap,
+			     GPSInfo) from ReceiveGPSInfo.wsdl. Before this, the profile only ran if someone passed
+			     -Psoap-codegen explicitly; a plain `mvn test` (no clean) kept working by accident because
+			     target/generated-sources/wsimport from a much earlier manual run was never deleted. The
+			     first real `mvn clean test` in this project's history (2026-07-16, during a Phase 8
+			     post-Layer-2 audit) wiped target/ and failed to compile — proving a fresh clone or CI run
+			     would have failed the exact same way. -->
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
 			<build>
 				<plugins>
 					<plugin>
