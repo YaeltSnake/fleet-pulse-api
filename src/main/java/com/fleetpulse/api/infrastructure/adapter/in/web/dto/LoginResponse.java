@@ -6,13 +6,13 @@ import java.time.Instant;
 
 public record LoginResponse(
         String accessToken,
-        Instant expiresAt
+        Instant refreshTokenExpiresAt
 ) {
 
     public static LoginResponse from(AuthUseCase.AuthResult result){
         return new LoginResponse(
                 result.accessToken(),
-                result.expiresAt()
+                result.refreshTokenExpiresAt()
         );
     }
 }

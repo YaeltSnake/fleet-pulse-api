@@ -78,7 +78,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT,  "/api/units/*/deactivate").hasAuthority(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.POST, "/api/units/*/round/start").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
                         .requestMatchers(HttpMethod.POST, "/api/units/*/round/stop").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
-                        .requestMatchers(HttpMethod.POST, "/api/units").hasAuthority(ROLE_ADMIN)
+                        // NOTE: no POST /api/units (create unit) rule here — deliberately out of
+                        // scope, see Phase 8 Layer 2 gap 2.6 in ROADMAP.md. Fleet is provisioned
+                        // via Flyway/DB seed only; anyRequest().denyAll() covers this path safely.
                         .requestMatchers(HttpMethod.PUT,  "/api/units/**").hasAuthority(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/units/**").hasAuthority(ROLE_ADMIN)
 

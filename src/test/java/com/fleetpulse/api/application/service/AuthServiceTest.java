@@ -61,7 +61,7 @@ class AuthServiceTest {
         // Assert
         assertThat(result.accessToken()).isEqualTo("Access Token");
         assertThat(result.refreshToken()).isEqualTo("Refresh Token");
-        assertThat(result.expiresAt()).isEqualTo(expectedExpiry);
+        assertThat(result.refreshTokenExpiresAt()).isEqualTo(expectedExpiry);
         verify(passwordHasher).matches("password", "hash");
         verify(refreshTokenRepository).revokeAllByUserId(1L);
         verify(refreshTokenRepository).save(any(RefreshToken.class));
@@ -200,7 +200,7 @@ class AuthServiceTest {
 
         assertThat(result.accessToken()).isEqualTo("new-access");
         assertThat(result.refreshToken()).isEqualTo("new-refresh");
-        assertThat(result.expiresAt()).isEqualTo(newExpiry);
+        assertThat(result.refreshTokenExpiresAt()).isEqualTo(newExpiry);
     }
 
     @Test

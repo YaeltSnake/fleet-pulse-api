@@ -8,14 +8,14 @@ public record RefreshResponse(
 
         String accessToken,
 
-        Instant expiresAt
+        Instant refreshTokenExpiresAt
 ) {
 
     public static RefreshResponse from(AuthUseCase.AuthResult result){
 
         return new RefreshResponse(
                 result.accessToken(),
-                result.expiresAt()
+                result.refreshTokenExpiresAt()
         );
     }
 }
