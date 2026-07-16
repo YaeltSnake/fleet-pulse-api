@@ -5,9 +5,12 @@ import com.fleetpulse.api.domain.model.PulseLogStatus;
 import com.fleetpulse.api.infrastructure.adapter.in.web.dto.PulseLogResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,11 +23,8 @@ import java.util.Objects;
 @Tag(name = "Pulse Log", description = "GPS pulse dispatch history")
 @RestController
 @RequestMapping("/api/pulse-log")
+@Validated
 public class PulseLogController {
-
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
-    private static final int MAX_SIZE     = 100;
 
     private final PulseLogRepository pulseLogRepository;
 
@@ -41,10 +41,8 @@ public class PulseLogController {
             @RequestParam(required = false) PulseLogStatus status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) ZonedDateTime to,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-
-        size = Math.min(size, MAX_SIZE);
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
 
         List<PulseLogResponse> content = pulseLogRepository
                 .findByFilters(numUnidad, status, from, to, page, size)

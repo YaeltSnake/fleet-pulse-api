@@ -2,6 +2,7 @@ package com.fleetpulse.api.infrastructure.adapter.in.web;
 
 import com.fleetpulse.api.domain.exception.*;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -11,6 +12,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.security.access.AccessDeniedException;
@@ -73,6 +75,33 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
 
+    }
+
+    // ConstraintViolationException: thrown by the @Validated AOP interceptor (MethodValidationPostProcessor)
+    // for @RequestParam/@PathVariable constraint violations on classes annotated @Validated -- this is the
+    // path actually taken by both UserController and PulseLogController in this codebase.
+    // HandlerMethodValidationException: Spring MVC 6.1's native method-validation exception, kept as a
+    // second handler in case a future controller triggers that path instead (no @Validated on the class).
+    @ExceptionHandler({
+            ConstraintViolationException.class,
+            HandlerMethodValidationException.class
+    })
+    public ResponseEntity<ProblemDetail> handleParameterValidationFailure(
+            Exception ex,
+            HttpServletRequest request
+    ){
+        log.warn("VALIDATION_FAILED {} - path: {} - client: {}",
+                ex.getClass().getSimpleName(),
+                request.getRequestURI(),
+                request.getRemoteAddr());
+
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setType(URI.create(VALIDATION_FAILED));
+        problem.setTitle("Validation failed");
+        problem.setDetail("One or more request parameters failed validation (e.g. page/size out of range)");
+        addStandardProperties(problem, request);
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problem);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

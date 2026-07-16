@@ -91,17 +91,23 @@ class PulseLogControllerTest {
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
-    // 9.9.5 — size capped at 100; request with 500 calls repo with 100
+    // 9.9.5 — size > 100 rejected with 400 (gap 2.4: was a silent clamp, now consistent with
+    // GET /api/users which already rejects via @Max(100))
     @Test
     @WithMockUser(authorities = "ADMIN")
-    void listLogs_withOversizedPage_capsAt100() throws Exception {
-        when(pulseLogRepository.findByFilters(isNull(), isNull(), isNull(), isNull(), eq(0), eq(100)))
-                .thenReturn(List.of());
-        when(pulseLogRepository.countByFilters(any(), any(), any(), any()))
-                .thenReturn(0L);
-
+    void listLogs_withOversizedPage_returns400() throws Exception {
         mockMvc.perform(get("/api/pulse-log").param("size", "500"))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://api.fleetpulse.com/errors/validation-failed"));
+    }
+
+    // 9.9.5b — negative page rejected with 400
+    @Test
+    @WithMockUser(authorities = "ADMIN")
+    void listLogs_withNegativePage_returns400() throws Exception {
+        mockMvc.perform(get("/api/pulse-log").param("page", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://api.fleetpulse.com/errors/validation-failed"));
     }
 
     // 9.9.6 — filter by status forwarded to repository
