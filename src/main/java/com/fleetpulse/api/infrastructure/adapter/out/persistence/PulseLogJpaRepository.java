@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public interface PulseLogJpaRepository extends JpaRepository<PulseLogEntity, Long> {
 
@@ -41,4 +42,10 @@ public interface PulseLogJpaRepository extends JpaRepository<PulseLogEntity, Lon
             @Param("from")      LocalDateTime from,
             @Param("to")        LocalDateTime to
     );
+
+    @Query("SELECT MAX(e.sentAt) FROM PulseLogEntity e WHERE e.numUnidad = :numUnidad")
+    LocalDateTime findLatestSentAt(@Param("numUnidad") String numUnidad);
+
+    @Query("SELECT e.numUnidad, MAX(e.sentAt) FROM PulseLogEntity e GROUP BY e.numUnidad")
+    List<Object[]> findLatestSentAtGroupedByUnit();
 }

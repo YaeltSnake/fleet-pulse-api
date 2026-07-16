@@ -5,6 +5,8 @@ import com.fleetpulse.api.domain.model.PulseLogStatus;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 public interface PulseLogRepository {
 
@@ -25,4 +27,8 @@ public interface PulseLogRepository {
             ZonedDateTime from,
             ZonedDateTime to
     );
+
+    Optional<ZonedDateTime> findLatestSentAt(String numUnidad);
+
+    Map<String, ZonedDateTime> findLatestSentAtForAllUnits();
 }

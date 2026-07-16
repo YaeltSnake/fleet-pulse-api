@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fleetpulse.api.application.port.in.ConfigureScheduleUseCase;
 import com.fleetpulse.api.application.port.in.ManageRoundUseCase;
 import com.fleetpulse.api.application.port.in.ManageUnitUseCase;
+import com.fleetpulse.api.application.port.out.PulseLogRepository;
 import com.fleetpulse.api.application.port.out.TokenBlacklist;
 import com.fleetpulse.api.application.port.out.TokenService;
 import com.fleetpulse.api.domain.exception.UnitNotFoundException;
@@ -19,12 +20,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
@@ -47,6 +51,7 @@ class UnitControllerTest {
     @MockitoBean ManageUnitUseCase manageUnitUseCase;
     @MockitoBean ConfigureScheduleUseCase configureScheduleUseCase;
     @MockitoBean ManageRoundUseCase manageRoundUseCase;
+    @MockitoBean PulseLogRepository pulseLogRepository;
     @MockitoBean TokenBlacklist tokenBlacklist;
 
     @BeforeEach
@@ -54,6 +59,9 @@ class UnitControllerTest {
         when(tokenBlacklist.isBlacklisted(any())).thenReturn(false);
         // manageRoundUseCase.isRoundActive() returns false by default (Mockito default for boolean)
         // manageRoundUseCase.getRoundCoordinateMode() returns null by default
+        // pulseLogRepository.findLatestSentAt() returns Optional.empty(), findLatestSentAtForAllUnits()
+        // returns an empty Map by default (Mockito RETURNS_DEFAULTS) — lastPulseAt is null unless a
+        // test stubs it explicitly
     }
 
     // ── GET /api/units ────────────────────────────────────────────────────────
@@ -76,7 +84,24 @@ class UnitControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].numUnidad").value("Peugeot"))
-                .andExpect(jsonPath("$[0].roundActive").value(false));
+                .andExpect(jsonPath("$[0].roundActive").value(false))
+                .andExpect(jsonPath("$[0].lastPulseAt").value(nullValue()));
+    }
+
+    // 9.9.2b — gap 2.1: a unit with pulse history gets its lastPulseAt populated in the list response
+    @Test
+    void listUnits_withPulseHistory_returnsLastPulseAt() throws Exception {
+        String token = tokenService.generateAccessToken(2L, "USER");
+        ZonedDateTime lastPulse = ZonedDateTime.of(2026, 7, 15, 10, 30, 0, 0, ZoneId.of("America/Mexico_City"));
+        when(manageUnitUseCase.listAllUnits()).thenReturn(List.of(activeUnit("Peugeot")));
+        when(pulseLogRepository.findLatestSentAtForAllUnits())
+                .thenReturn(Map.of("Peugeot", lastPulse));
+
+        mockMvc.perform(get("/api/units")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].lastPulseAt").exists())
+                .andExpect(jsonPath("$[0].lastPulseAt").value(org.hamcrest.Matchers.not(nullValue())));
     }
 
     // ── GET /api/units/{numUnidad} ────────────────────────────────────────────
@@ -92,7 +117,23 @@ class UnitControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.numUnidad").value("Peugeot"))
                 .andExpect(jsonPath("$.active").value(true))
-                .andExpect(jsonPath("$.roundActive").value(false));
+                .andExpect(jsonPath("$.roundActive").value(false))
+                .andExpect(jsonPath("$.lastPulseAt").value(nullValue()));
+    }
+
+    // 9.9.3b — gap 2.1: getUnit() looks up the single-unit lastPulseAt, not the bulk map
+    @Test
+    void getUnit_withPulseHistory_returnsLastPulseAt() throws Exception {
+        String token = tokenService.generateAccessToken(1L, "ADMIN");
+        ZonedDateTime lastPulse = ZonedDateTime.of(2026, 7, 15, 10, 30, 0, 0, ZoneId.of("America/Mexico_City"));
+        when(manageUnitUseCase.findByNumUnidad("Peugeot")).thenReturn(Optional.of(activeUnit("Peugeot")));
+        when(pulseLogRepository.findLatestSentAt("Peugeot")).thenReturn(Optional.of(lastPulse));
+
+        mockMvc.perform(get("/api/units/Peugeot")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastPulseAt").exists())
+                .andExpect(jsonPath("$.lastPulseAt").value(org.hamcrest.Matchers.not(nullValue())));
     }
 
     // 9.9.4

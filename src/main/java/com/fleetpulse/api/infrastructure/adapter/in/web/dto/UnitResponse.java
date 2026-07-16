@@ -4,6 +4,7 @@ import com.fleetpulse.api.domain.model.CoordinateMode;
 import com.fleetpulse.api.domain.model.Unit;
 
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
 
 public record UnitResponse(
         String numUnidad,
@@ -12,9 +13,11 @@ public record UnitResponse(
         LocalTime horaFin,
         boolean active,
         boolean roundActive,
-        CoordinateMode currentCoordinateMode
+        CoordinateMode currentCoordinateMode,
+        ZonedDateTime lastPulseAt
 ) {
-    public static UnitResponse from(Unit unit, boolean roundActive, CoordinateMode currentMode) {
+    public static UnitResponse from(Unit unit, boolean roundActive, CoordinateMode currentMode,
+                                     ZonedDateTime lastPulseAt) {
         return new UnitResponse(
                 unit.getNumUnidad(),
                 unit.isHorarioFijo(),
@@ -22,7 +25,8 @@ public record UnitResponse(
                 unit.getHoraFin(),
                 unit.isActive(),
                 roundActive,
-                currentMode
+                currentMode,
+                lastPulseAt
         );
     }
 }

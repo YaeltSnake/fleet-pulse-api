@@ -3,6 +3,7 @@ package com.fleetpulse.api.infrastructure.adapter.in.web;
 import com.fleetpulse.api.application.port.in.ConfigureScheduleUseCase;
 import com.fleetpulse.api.application.port.in.ManageRoundUseCase;
 import com.fleetpulse.api.application.port.in.ManageUnitUseCase;
+import com.fleetpulse.api.application.port.out.PulseLogRepository;
 import com.fleetpulse.api.domain.exception.UnitNotFoundException;
 import com.fleetpulse.api.domain.model.CoordinateMode;
 import com.fleetpulse.api.domain.model.Unit;
@@ -21,7 +22,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Tag(name = "Units", description = "Fleet unit status and schedule management")
@@ -32,16 +35,20 @@ public class UnitController {
     private final ManageUnitUseCase manageUnitUseCase;
     private final ConfigureScheduleUseCase configureScheduleUseCase;
     private final ManageRoundUseCase manageRoundUseCase;
+    private final PulseLogRepository pulseLogRepository;
 
     public UnitController(ManageUnitUseCase manageUnitUseCase,
                           ConfigureScheduleUseCase configureScheduleUseCase,
-                          ManageRoundUseCase manageRoundUseCase) {
+                          ManageRoundUseCase manageRoundUseCase,
+                          PulseLogRepository pulseLogRepository) {
         this.manageUnitUseCase = Objects.requireNonNull(manageUnitUseCase,
                 "manageUnitUseCase must not be null");
         this.configureScheduleUseCase = Objects.requireNonNull(configureScheduleUseCase,
                 "configureScheduleUseCase must not be null");
         this.manageRoundUseCase = Objects.requireNonNull(manageRoundUseCase,
                 "manageRoundUseCase must not be null");
+        this.pulseLogRepository = Objects.requireNonNull(pulseLogRepository,
+                "pulseLogRepository must not be null");
     }
 
     @GetMapping
@@ -54,11 +61,13 @@ public class UnitController {
                     content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     public ResponseEntity<List<UnitResponse>> listUnits() {
+        Map<String, ZonedDateTime> lastPulseByUnit = pulseLogRepository.findLatestSentAtForAllUnits();
         List<UnitResponse> responses = manageUnitUseCase.listAllUnits().stream()
                 .map(unit -> UnitResponse.from(
                         unit,
                         manageRoundUseCase.isRoundActive(unit.getNumUnidad()),
-                        manageRoundUseCase.getRoundCoordinateMode(unit.getNumUnidad())))
+                        manageRoundUseCase.getRoundCoordinateMode(unit.getNumUnidad()),
+                        lastPulseByUnit.get(unit.getNumUnidad())))
                 .toList();
         return ResponseEntity.ok(responses);
     }
@@ -79,7 +88,8 @@ public class UnitController {
                 .orElseThrow(() -> new UnitNotFoundException(numUnidad));
         boolean roundActive = manageRoundUseCase.isRoundActive(numUnidad);
         CoordinateMode currentMode = manageRoundUseCase.getRoundCoordinateMode(numUnidad);
-        return ResponseEntity.ok(UnitResponse.from(unit, roundActive, currentMode));
+        ZonedDateTime lastPulseAt = pulseLogRepository.findLatestSentAt(numUnidad).orElse(null);
+        return ResponseEntity.ok(UnitResponse.from(unit, roundActive, currentMode, lastPulseAt));
     }
 
     @PutMapping("/{numUnidad}/activate")
@@ -97,7 +107,8 @@ public class UnitController {
         Unit updated = manageUnitUseCase.activateUnit(numUnidad);
         boolean roundActive = manageRoundUseCase.isRoundActive(numUnidad);
         CoordinateMode currentMode = manageRoundUseCase.getRoundCoordinateMode(numUnidad);
-        return ResponseEntity.ok(UnitResponse.from(updated, roundActive, currentMode));
+        ZonedDateTime lastPulseAt = pulseLogRepository.findLatestSentAt(numUnidad).orElse(null);
+        return ResponseEntity.ok(UnitResponse.from(updated, roundActive, currentMode, lastPulseAt));
     }
 
     @PutMapping("/{numUnidad}/deactivate")
@@ -115,7 +126,8 @@ public class UnitController {
         Unit updated = manageUnitUseCase.deactivateUnit(numUnidad);
         boolean roundActive = manageRoundUseCase.isRoundActive(numUnidad);
         CoordinateMode currentMode = manageRoundUseCase.getRoundCoordinateMode(numUnidad);
-        return ResponseEntity.ok(UnitResponse.from(updated, roundActive, currentMode));
+        ZonedDateTime lastPulseAt = pulseLogRepository.findLatestSentAt(numUnidad).orElse(null);
+        return ResponseEntity.ok(UnitResponse.from(updated, roundActive, currentMode, lastPulseAt));
     }
 
     @PutMapping("/{numUnidad}/schedule")
@@ -154,6 +166,7 @@ public class UnitController {
 
         boolean roundActive = manageRoundUseCase.isRoundActive(numUnidad);
         CoordinateMode currentMode = manageRoundUseCase.getRoundCoordinateMode(numUnidad);
-        return ResponseEntity.ok(UnitResponse.from(updated, roundActive, currentMode));
+        ZonedDateTime lastPulseAt = pulseLogRepository.findLatestSentAt(numUnidad).orElse(null);
+        return ResponseEntity.ok(UnitResponse.from(updated, roundActive, currentMode, lastPulseAt));
     }
 }

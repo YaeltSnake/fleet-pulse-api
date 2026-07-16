@@ -12,6 +12,9 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 public class PulseLogJpaAdapter implements PulseLogRepository {
@@ -45,6 +48,21 @@ public class PulseLogJpaAdapter implements PulseLogRepository {
     public long countByFilters(String numUnidad, PulseLogStatus status,
                                ZonedDateTime from, ZonedDateTime to) {
         return jpaRepository.countByFilters(numUnidad, status, toLocal(from), toLocal(to));
+    }
+
+    @Override
+    public Optional<ZonedDateTime> findLatestSentAt(String numUnidad) {
+        return Optional.ofNullable(jpaRepository.findLatestSentAt(numUnidad))
+                .map(sentAt -> sentAt.atZone(FLEET_TIMEZONE));
+    }
+
+    @Override
+    public Map<String, ZonedDateTime> findLatestSentAtForAllUnits() {
+        return jpaRepository.findLatestSentAtGroupedByUnit().stream()
+                .collect(Collectors.toMap(
+                        row -> (String) row[0],
+                        row -> ((LocalDateTime) row[1]).atZone(FLEET_TIMEZONE)
+                ));
     }
 
     private PulseLog toDomain(PulseLogEntity entity) {
