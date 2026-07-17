@@ -4685,10 +4685,10 @@ One documented pass per screen, in the same style as the Phase 5 production-repl
 
 | Status | Task |
 |---|---|
-| ⬜ | Tag `v1.3.0` only after Layers 1–6 are complete |
-| ⬜ | Add explicit note to `CLAUDE.md` Phase 9 readiness checklist: "No backend contract changes during Phase 9 except genuine bugs found while integrating — any UI-driven shape change is a Phase 8 regression" |
+| ✅ | Added explicit note to `CLAUDE.md` Phase 9 readiness checklist (2026-07-17): "No backend contract changes during Phase 9 except genuine bugs found while integrating — any UI-driven shape change is a Phase 8 regression" |
+| ⬜ | Tag `v1.3.0` — gate fully met 2026-07-17 (Layers 1–6 all complete), **user explicitly chose to defer tagging** (same pattern as `v1.2.0`) — ask again later, do not tag without asking again (a prior "not now" is not a standing "never") |
 
-Exit condition: `v1.3.0` tagged. Every screen in Phase 9 can be built against a contract that will not move under it.
+Exit condition (GATE MET, tag pending): Every screen in Phase 9 can be built against a contract that will not move under it. Tag `v1.3.0` whenever the user confirms.
 
 ---
 
