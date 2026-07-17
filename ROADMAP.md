@@ -4656,15 +4656,17 @@ Distinct from the existing unit/controller test suite — this exercises the ful
 
 Exit condition met: the flow passes end-to-end in a single test run, proving the endpoints compose correctly — not just individually.
 
-### Layer 5 — Browser-Realistic CORS/Cookie Verification
+### Layer 5 — Browser-Realistic CORS/Cookie Verification ✅ COMPLETE 2026-07-16
 
 MockMvc and `TestRestTemplate` do not exercise real browser CORS/cookie enforcement. Before trusting Phase 7's cookie work, prove it under an actual browser.
 
 | Status | Task |
 |---|---|
-| ⬜ | Minimal static HTML page (`scratch/cors-test.html`, not committed) served from a different port than the API, using `fetch(..., { credentials: 'include' })` against `/api/auth/login` and `/api/auth/refresh` |
-| ⬜ | Confirm in DevTools Network tab: `Set-Cookie` accepted, cookie sent back on `/api/auth/refresh`, no CORS error in console |
-| ⬜ | Confirm cookie does **not** get sent to `/api/units` or other non-`/api/auth` endpoints (Path scoping working) |
+| ✅ | `scratch/cors-test.html` (gitignored, not committed) served via `npx http-server` on `http://localhost:5173` — the exact origin `SecurityConfig`'s `ALLOWED_ORIGIN` already permits — with 4 buttons hitting `/api/auth/login`, `/api/auth/refresh`, `GET /api/units`, `/api/auth/logout`, all with `fetch(..., { credentials: 'include' })` |
+| ✅ | Confirmed in real Chrome/Edge DevTools Network tab (not simulated): login `200`, `Set-Cookie` present with every attribute correct — `Path=/api/auth; Max-Age=604800; Secure; HttpOnly; SameSite=Strict`; `access-control-allow-origin` echoes the exact origin (never `*`) with `access-control-allow-credentials: true`; the `refresh` call's **Request Headers** show `cookie: refresh_token=...` sent automatically by the browser — no JS in the test page ever touches the cookie value, proving the round-trip is real, not simulated |
+| ✅ | Confirmed the cookie does **not** leak to `GET /api/units` — that request's Request Headers show other (unrelated, pre-existing `localhost`-wide analytics) cookies but **no `refresh_token`**, proving `Path=/api/auth` scoping works for real, not just in a unit test's assumptions |
+
+**Evidence:** captured directly from DevTools Network tab, both `Response Headers` (login/refresh `Set-Cookie`) and `Request Headers` (refresh/units `Cookie`), reviewed 2026-07-16.
 
 ### Layer 6 — Full Manual Smoke Test Script
 
