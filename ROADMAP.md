@@ -4638,16 +4638,23 @@ All 7 gaps were reviewed with the user via `AskUserQuestion` on 2026-07-13 — e
 
 **Layer 3 exit condition met 2026-07-16.** `openapi.json` committed, reflects the real, currently-running contract (including every Layer 2 addition), both blocking prerequisites found and fixed along the way.
 
-### Layer 4 — End-to-End Integration Test Suite (new)
+### Layer 4 — End-to-End Integration Test Suite (new) ✅ COMPLETE 2026-07-16
 
 Distinct from the existing unit/controller test suite — this exercises the full stack in one flow, the way the frontend actually will.
 
+**Design decisions (confirmed with the user via `AskUserQuestion`, deviating from the original spec):**
+- **H2, not Testcontainers MySQL** — consistent with the rest of the 312-test suite (all `@SpringBootTest` classes already run against H2 via `application-test.properties`). The point of this layer is proving the endpoints *compose*, which doesn't depend on the SQL dialect — MySQL-specific behavior was already verified manually against real MySQL during the Phase 8 post-Layer-2 audit.
+- **Real Redis via Testcontainers, not mocked** — the assertion "the access token is rejected after logout" would be meaningless against a mocked `TokenBlacklist` (it would only prove the mock returns what we told it to). Same `@Container`/`@DynamicPropertySource` pattern already established in `RedisTokenBlacklistAdapterTest`.
+- **Only `PulseSender` is mocked** — the one genuine external boundary (the real QSolutions SOAP service) that must never be hit by an automated test. Everything else runs for real: `AuthService`, real password verification, real JWT issuance, `JwtAuthenticationFilter`, the httpOnly cookie, `RoundManagementService`/`PulseOrchestrationService`, `PulseLogRepository`, `UnitRepository`. This is also the **first test in the entire suite that calls `POST /api/auth/login` with real credentials** — every other test generates a JWT directly via `TokenService`, bypassing the real login path.
+
 | Status | Task |
 |---|---|
-| ⬜ | New test class `FullDispatchFlowIntegrationTest` — `@SpringBootTest` + Testcontainers (MySQL + Redis), real HTTP client (`TestRestTemplate` or `WebTestClient`), cookie jar enabled |
-| ⬜ | Flow: login → cookie captured → `GET /api/units` with access token → `POST /api/units/{id}/pulse/force` → `GET /api/pulse-log` confirms new `SENT` entry → `POST /api/auth/refresh` via cookie → `POST /api/auth/logout` → confirm cookie cleared and access token now rejected |
+| ✅ | New test class `FullDispatchFlowIntegrationTest` (`com.fleetpulse.api.integration` — new package, deliberately separate from the per-controller/per-service test packages) |
+| ✅ | Flow implemented exactly as specified: login → cookie + access token captured manually (`TestRestTemplate` does not manage a cookie jar automatically, unlike a browser) → `GET /api/units` confirms a seeded test unit → `POST /api/units/{numUnidad}/pulse/force` (`MANUAL` coordinates) → `GET /api/pulse-log` confirms a new `SENT` entry → `POST /api/auth/refresh` via the captured cookie, both access token and cookie rotate → `POST /api/auth/logout` with the rotated credentials → `GET /api/units` with the now-blacklisted access token confirms `401` |
 
-Exit condition: flow passes end-to-end in a single test run, proving the endpoints compose correctly, not just individually.
+**Evidence:** `mvn test` — 313 passing (312 + this one), 0 failures, 0 errors, 2 skipped, `BUILD SUCCESS`, passed on the first run.
+
+Exit condition met: the flow passes end-to-end in a single test run, proving the endpoints compose correctly — not just individually.
 
 ### Layer 5 — Browser-Realistic CORS/Cookie Verification
 
