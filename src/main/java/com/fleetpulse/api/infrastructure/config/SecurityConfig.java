@@ -46,6 +46,16 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        // Spring Boot's internal error-page forward (DispatcherType.ERROR). Our
+                        // JwtAuthenticationFilter is a OncePerRequestFilter, which by default skips
+                        // itself on this dispatch (shouldNotFilterErrorDispatch() == true) — but
+                        // Spring Security's own AuthorizationFilter/ExceptionTranslationFilter still
+                        // run on it. Without this rule, the forward to /error has no Authentication,
+                        // falls through to anyRequest().denyAll(), and clobbers the ORIGINAL correct
+                        // 403 with a 401 from the second, unauthenticated pass. Discovered via manual
+                        // smoke testing (Phase 8 Layer 6) — MockMvc never exercises a real container
+                        // error dispatch, so the whole existing test suite passed anyway.
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
 
