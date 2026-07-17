@@ -4630,9 +4630,13 @@ All 7 gaps were reviewed with the user via `AskUserQuestion` on 2026-07-13 — e
 
 | Status | Task |
 |---|---|
-| ⬜ | Regenerate `/v3/api-docs`, confirm every endpoint in the Layer 1 audit is documented with `@Operation` + `@ApiResponse` |
-| ⬜ | Export a static snapshot (`openapi.json`) and commit it to the repo |
-| ⬜ | Add a CI/manual check comparing live `/v3/api-docs` against the committed snapshot — drift means the contract moved without the roadmap being updated |
+| ✅ | **Prerequisite #1 found while starting this layer, not originally scoped:** `GET /v3/api-docs` and `/swagger-ui.html` had no `SecurityConfig` rule at all — fell through to `anyRequest().denyAll()`, `403` for everyone including a valid ADMIN token. Decided with the user (`AskUserQuestion` 2026-07-16): authenticated, any role (`hasAnyAuthority(ADMIN, USER)`) — same level as `GET /api/pulse-log`, not public, consistent with ADR-008. Added `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` matchers. |
+| ✅ | **Prerequisite #2 found immediately after #1 was fixed:** with the security block gone, `/v3/api-docs` returned `500` — `NoSuchMethodError: ControllerAdviceBean.<init>(Object)`. `springdoc-openapi-starter-webmvc-ui:2.5.0` is binary-incompatible with the `spring-webmvc:6.2.19` this project has run since the FIXME-Q6 CVE-driven Spring Boot bump (Phase 6 §4.1, 2026-07-08) — a silent breakage that existed for over a week because nobody had ever actually hit this endpoint before today (and prerequisite #1 was blocking it anyway). Bumped to `2.8.6` (confirmed against Maven Central's actual index, not a search-engine summary that briefly surfaced a version number that doesn't exist). See `FIXME-SPRINGDOC-VERSION` in `CLAUDE.md` §7. |
+| ✅ | Regenerated `/v3/api-docs` (2026-07-16, after both prerequisite fixes) — all 17 route entries present (18 counting method variants: `GET`/`POST` on `/api/gps/position`, `GET`/`POST` on `/api/users`, `PUT`/`DELETE`/`PATCH` on `/api/users/{id}`), every one has `@Operation` summary + a `responses` map with a description per status code and a `ProblemDetail` schema ref on every error path. Minor stylistic gap, not structural: a few endpoints (`GET /api/units`, `GET /api/units/{numUnidad}`) have only a `summary`, no extended `description` — acceptable, not blocking. |
+| ✅ | Exported the live `/v3/api-docs` JSON, pretty-printed (`ConvertFrom-Json`/`ConvertTo-Json -Depth 100`, explicit `-Encoding utf8` on both read and write — the first attempt without it mangled every em-dash in the doc into `â€”` mojibake) and committed to the repo root as `openapi.json` (1987 lines formatted, vs. the single-line minified fetch). |
+| ✅ | No CI pipeline exists in this project (single-developer, manual `mvn`/git workflow throughout) — established as a manual discipline instead, documented in `CLAUDE.md` §9: before touching any controller from here forward, re-fetch `/v3/api-docs` and diff against the committed `openapi.json`; a diff with no matching `ROADMAP.md` update is a Phase 8 regression. |
+
+**Layer 3 exit condition met 2026-07-16.** `openapi.json` committed, reflects the real, currently-running contract (including every Layer 2 addition), both blocking prerequisites found and fixed along the way.
 
 ### Layer 4 — End-to-End Integration Test Suite (new)
 

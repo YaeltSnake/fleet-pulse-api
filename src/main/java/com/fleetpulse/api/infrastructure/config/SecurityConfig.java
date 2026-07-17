@@ -49,6 +49,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
 
+                        // OpenAPI contract (Phase 8 Layer 3) — authenticated, not public. This is an
+                        // internal fleet-management API, not a product with public API docs; the
+                        // contract shape (routes, DTOs, validation rules) stays behind a login,
+                        // consistent with ADR-008 (deny by default, nothing exposed without reason).
+                        .requestMatchers(HttpMethod.GET, "/v3/api-docs/**").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
+                        .requestMatchers(HttpMethod.GET, "/swagger-ui/**").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
+                        .requestMatchers(HttpMethod.GET, "/swagger-ui.html").hasAnyAuthority(ROLE_ADMIN, ROLE_USER)
+
                         // FIXME-SEC (Phase 6): Traccar endpoint. Currently permitAll() for OsmAnd
                         // push protocol. Must add API-key validation or IP whitelist before v1.1.0.
                         // FIXME-SEC: /api/gps/position is fully public — no IP whitelist.

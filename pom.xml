@@ -119,7 +119,13 @@
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-			<version>2.5.0</version>
+			<!-- FIXME-SPRINGDOC-VERSION (RESOLVED 2026-07-16): bumped 2.5.0 to 2.8.6. 2.5.0 predates the
+			     spring-webmvc version this project runs on (bumped to 6.2.19 for FIXME-Q6's CVE fixes,
+			     Phase 6 2026-07-08) and threw NoSuchMethodError on ControllerAdviceBean.init at runtime
+			     when /v3/api-docs was first actually hit (Phase 8 Layer 3). Latent since the FIXME-Q6
+			     bump; nobody noticed because the endpoint had no SecurityConfig rule and returned 403
+			     before this fix, hiding the incompatibility underneath. -->
+			<version>2.8.6</version>
 		</dependency>
 
 		<dependency>
